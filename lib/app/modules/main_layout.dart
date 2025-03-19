@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import '../controllers/navigation_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../themes/app_theme.dart';
-import 'categories/categories_screen.dart';
 import 'home/home_screen.dart';
 import 'leaderboard/leaderboard_screen.dart';
 import 'random_picker/random_picker_screen.dart';
@@ -25,7 +24,6 @@ class MainLayout extends StatelessWidget {
           index: navigationController.selectedIndex.value,
           children: const [
             HomeScreen(),
-            CategoriesScreen(),
             RandomPickerScreen(),
             LeaderboardScreen(),
             SettingsScreen(),
@@ -61,7 +59,6 @@ class MainLayout extends StatelessWidget {
               showUnselectedLabels: true,
               items: const [
                 BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-                BottomNavigationBarItem(icon: Icon(Icons.category_rounded), label: 'Categories'),
                 BottomNavigationBarItem(icon: Icon(Icons.casino_rounded), label: 'Random'),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.leaderboard_rounded),

@@ -8,8 +8,10 @@ import 'app/controllers/leaderboard_controller.dart';
 import 'app/controllers/navigation_controller.dart';
 import 'app/controllers/theme_controller.dart';
 import 'app/controllers/timer_controller.dart';
+import 'app/data/models/chatgpt_suggestion_model.dart';
 import 'app/data/models/game_model.dart';
 import 'app/data/models/leaderboard_entry_model.dart';
+import 'app/data/providers/chatgpt_provider.dart';
 import 'app/data/providers/game_provider.dart';
 import 'app/data/providers/leaderboard_provider.dart';
 import 'app/routes/app_pages.dart';
@@ -26,6 +28,8 @@ Future<void> main() async {
   // Register Hive adapters
   Hive.registerAdapter(GameAdapter());
   Hive.registerAdapter(LeaderboardEntryAdapter());
+  Hive.registerAdapter(ChatGptSuggestionAdapter());
+  Hive.registerAdapter(SuggestionTypeAdapter());
 
   // Initialize services
   await initServices();
@@ -38,6 +42,7 @@ Future<void> initServices() async {
   // Initialize providers
   final gameProvider = await Get.putAsync(() => GameProvider().init());
   final leaderboardProvider = await Get.putAsync(() => LeaderboardProvider().init());
+  final chatGptProvider = await Get.putAsync(() => ChatGptProvider().init());
 
   // Initialize services
   await Get.putAsync(() => ChatGptService().init());

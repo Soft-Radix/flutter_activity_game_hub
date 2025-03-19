@@ -7,6 +7,7 @@ import '../modules/leaderboard/leaderboard_screen.dart';
 import '../modules/main_layout.dart';
 import '../modules/onboarding/onboarding_screen.dart';
 import '../modules/random_picker/random_picker_screen.dart';
+import '../modules/saved_suggestions/saved_suggestions_screen.dart';
 import '../modules/settings/settings_screen.dart';
 import '../modules/splash/splash_screen.dart';
 import '../modules/timer_scoreboard/timer_scoreboard_screen.dart';
@@ -55,5 +56,6 @@ class AppPages {
       page: () => const SettingsScreen(),
       transition: Transition.rightToLeft,
     ),
+    GetPage(name: Routes.SAVED_SUGGESTIONS, page: () => const SavedSuggestionsScreen()),
   ];
 }

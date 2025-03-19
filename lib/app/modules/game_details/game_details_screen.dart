@@ -53,26 +53,6 @@ class GameDetailsScreen extends StatelessWidget {
                     child: _buildGameImage(game.imageUrl, themeController),
                   ),
                 ),
-                // Back button with backdrop
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => Get.back(),
-                      borderRadius: BorderRadius.circular(30),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.arrow_back, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
                 if (game.isFeatured)
                   Positioned(
                     top: 16,

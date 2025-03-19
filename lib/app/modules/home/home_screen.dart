@@ -62,12 +62,22 @@ class HomeScreen extends StatelessWidget {
 
                           // ChatGPT Suggestion Box
                           ChatGptSuggestionCard(
-                            suggestion: controller.gameSuggestion.value,
                             onRefresh: () => controller.getGameSuggestion(),
                             onSearch: () {
                               // Show dialog to input search parameters
                               _showSearchDialog(context, controller);
                             },
+                          ),
+
+                          // View saved suggestions button
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: () => Get.toNamed(Routes.SAVED_SUGGESTIONS),
+                              icon: const Icon(Icons.collections_bookmark),
+                              label: const Text('View All Suggestions'),
+                              style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
+                            ),
                           ),
                           const SizedBox(height: AppTheme.largePadding),
 
@@ -81,7 +91,8 @@ class HomeScreen extends StatelessWidget {
                               ),
                               TextButton.icon(
                                 onPressed: () {
-                                  navigationController.changePage(1); // Navigate to Categories
+                                  // Navigate to Categories screen directly
+                                  Get.toNamed(Routes.CATEGORIES);
                                 },
                                 icon: const Icon(Icons.arrow_forward),
                                 label: const Text('See All'),
@@ -257,8 +268,9 @@ class HomeScreen extends StatelessWidget {
         return CategoryCard(
           category: category,
           onTap: () {
-            navigationController.changePage(1); // Navigate to Categories
-            Get.toNamed(Routes.CATEGORIES, arguments: category);
+            // Navigate directly to Categories screen
+            Get.find<AppController>().selectedCategory.value = category;
+            Get.toNamed(Routes.CATEGORIES);
           },
         );
       },

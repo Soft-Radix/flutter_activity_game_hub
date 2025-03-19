@@ -372,20 +372,6 @@ class _RandomPickerScreenState extends State<RandomPickerScreen> with TickerProv
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isSpinning ? null : _spinWheel,
-        tooltip: 'Spin Again',
-        backgroundColor:
-            _isSpinning
-                ? isDarkMode
-                    ? AppTheme.lightTextColorDarkMode
-                    : AppTheme.lightTextColor
-                : isDarkMode
-                ? AppTheme.primaryColorDarkMode
-                : AppTheme.primaryColor,
-        elevation: 4,
-        child: Icon(Icons.refresh, color: _isSpinning ? Colors.grey : Colors.white),
-      ),
     );
   }
 }

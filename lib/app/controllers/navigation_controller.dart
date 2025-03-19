@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../routes/app_pages.dart';
@@ -9,11 +10,17 @@ class NavigationController extends GetxController {
   // List of main routes
   final List<String> routes = [
     Routes.HOME,
-    Routes.CATEGORIES,
     Routes.RANDOM_PICKER,
     Routes.LEADERBOARD,
     Routes.SETTINGS,
   ];
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Ensure we always start at index 0 (Home)
+    selectedIndex.value = 0;
+  }
 
   // Change the selected tab
   void changePage(int index) {
@@ -27,12 +34,10 @@ class NavigationController extends GetxController {
       case 0:
         return 'Activity Game Hub';
       case 1:
-        return 'Categories';
-      case 2:
         return 'Random Picker';
-      case 3:
+      case 2:
         return 'Leaderboard';
-      case 4:
+      case 3:
         return 'Settings';
       default:
         return 'Activity Game Hub';
@@ -40,10 +45,14 @@ class NavigationController extends GetxController {
   }
 
   // Update index when navigating to a specific page externally
+  // This method uses scheduleMicrotask to avoid updating during build phase
   void updateIndex(String route) {
-    int index = routes.indexOf(route);
-    if (index != -1) {
-      selectedIndex.value = index;
-    }
+    // Use scheduleMicrotask to defer the update until after the current build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      int index = routes.indexOf(route);
+      if (index != -1) {
+        selectedIndex.value = index;
+      }
+    });
   }
 }
