@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" fill="none">
+  <!-- Outer circle -->
+  <circle cx="100" cy="100" r="90" stroke="currentColor" stroke-width="10" />
+  
+  <!-- Game controller icon -->
+  <path d="M65 80H80V90H90V105H80V115H65V105H55V90H65V80Z" fill="currentColor" />
+  
+  <!-- Dice icon -->
+  <rect x="110" y="80" width="35" height="35" rx="5" fill="currentColor" />
+  <circle cx="120" cy="90" r="4" fill="white" />
+  <circle cx="135" cy="90" r="4" fill="white" />
+  <circle cx="120" cy="105" r="4" fill="white" />
+  <circle cx="135" cy="105" r="4" fill="white" />
+  
+  <!-- People/team icon -->
+  <circle cx="80" cy="140" r="12" fill="currentColor" />
+  <path d="M65 155C65 147.268 71.268 141 79 141H81C88.732 141 95 147.268 95 155V160H65V155Z" fill="currentColor" />
+  
+  <circle cx="120" cy="140" r="12" fill="currentColor" />
+  <path d="M105 155C105 147.268 111.268 141 119 141H121C128.732 141 135 147.268 135 155V160H105V155Z" fill="currentColor" />
+  
+  <!-- Timer/clock elements -->
+  <circle cx="100" cy="50" r="15" fill="currentColor" />
+  <path d="M100 35V50L110 60" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+</svg> 
