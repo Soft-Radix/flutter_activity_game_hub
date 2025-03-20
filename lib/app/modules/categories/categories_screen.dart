@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:get/get.dart';
 
-import '../../controllers/app_controller.dart';
+import '../../controllers/gemini_app_controller.dart';
 import '../../controllers/navigation_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../data/models/category_model.dart';
 import '../../data/models/game_model.dart';
+import '../../data/services/gemini_api_service.dart';
 import '../../routes/app_pages.dart';
 import '../../widgets/theme_toggle.dart';
+import '../../modules/categories/controllers/category_controller.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -18,7 +19,8 @@ class CategoriesScreen extends StatefulWidget {
 }
 
 class _CategoriesScreenState extends State<CategoriesScreen> {
-  final AppController _controller = Get.find<AppController>();
+  final GeminiAppController _geminiController = Get.find<GeminiAppController>();
+  final CategoryController _categoryController = Get.find<CategoryController>();
   final ThemeController _themeController = Get.find<ThemeController>();
   final NavigationController _navigationController = Get.find<NavigationController>();
   final RxInt _currentCategoryIndex = 0.obs;
@@ -29,6 +31,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   final RxBool _isSearching = false.obs;
   final RxList<String> _searchSuggestions = <String>[].obs;
   final RxBool _showSuggestions = false.obs;
+  final RxBool _isGeminiMode = false.obs;
+  final RxBool _isApiLoading = false.obs;
 
   final List<String> _dummySuggestions = [
     'Team building',
@@ -86,22 +90,33 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   void initState() {
     super.initState();
 
-    // Initialize filtered categories
+    // Check if we should use Gemini mode
+    if (Get.arguments != null && Get.arguments['useGemini'] == true) {
+      _isGeminiMode.value = true;
+
+      // If a specific category was passed from home
+      if (Get.arguments['category'] != null) {
+        final selectedCategory = Get.arguments['category'] as GameCategory;
+        _searchController.text = selectedCategory.name;
+      }
+    }
+
+    // Initialize filtered categories using CategoryController
     _refreshFilteredCategories();
 
     // Check if a specific category was selected
-    if (_controller.selectedCategory.value != null) {
-      final selectedCategory = _controller.selectedCategory.value!;
+    if (_categoryController.selectedCategory.value != null) {
+      final selectedCategory = _categoryController.selectedCategory.value!;
       final index = _filteredCategories.indexWhere((c) => c.id == selectedCategory.id);
       if (index != -1) {
         _currentCategoryIndex.value = index;
       }
       // Clear the selection after using it
-      _controller.selectedCategory.value = null;
+      _categoryController.clearSelectedCategory();
     }
 
     // Update navigation controller index
-    _navigationController.updateIndex(Routes.CATEGORIES);
+    _navigationController.updateIndex(AppRoutes.CATEGORIES);
 
     // Initialize filtered games
     _updateFilteredGames();
@@ -119,11 +134,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   void _refreshFilteredCategories() {
-    // Ensure categories are properly filtered
-    _filteredCategories.value =
-        _controller.categories
-            .where((category) => !_excludedCategories.contains(category.id))
-            .toList();
+    // Use CategoryController to get filtered categories
+    _filteredCategories.value = _categoryController.filteredCategories;
 
     // If we have no categories after filtering or current index is out of bounds
     if (_filteredCategories.isEmpty || _currentCategoryIndex.value >= _filteredCategories.length) {
@@ -155,7 +167,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     // Use real game data as additional suggestions if any match
     final allGames = <Game>[];
     for (final category in _filteredCategories) {
-      allGames.addAll(_controller.getGamesByCategory(category.id));
+      allGames.addAll(_categoryController.getGamesByCategory(category.id));
     }
 
     final matchedGames =
@@ -180,35 +192,177 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     _showSuggestions.value = true; // Always show suggestions when text is entered
   }
 
-  void _updateFilteredGames() {
+  void _updateFilteredGames() async {
     if (_filteredCategories.isEmpty) {
       _filteredGames.clear();
       return;
     }
 
-    final currentCategory = _filteredCategories[_currentCategoryIndex.value];
-    final categoryGames = _controller.getGamesByCategory(currentCategory.id);
+    if (_isGeminiMode.value) {
+      // Don't auto-search with Gemini API - wait for the user to press the search button
+      return;
+    }
 
-    // Apply filters
+    // For standard mode, use the existing filtering logic
+    final currentCategory = _filteredCategories[_currentCategoryIndex.value];
+
+    // Use CategoryController to get games for the category
+    List<Game> categoryGames = _categoryController.getGamesForCategory(
+      currentCategory.id,
+      useGemini: _isGeminiMode.value,
+    );
+
     _filteredGames.value =
         categoryGames.where((game) {
-          // Filter by players
+          // Search filter
+          final matchesSearch =
+              _searchController.text.isEmpty ||
+              game.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
+              game.description.toLowerCase().contains(_searchController.text.toLowerCase());
+
+          // Player filter
           final hasEnoughPlayers =
               game.minPlayers <= _minPlayers.value && game.maxPlayers >= _minPlayers.value;
 
-          // Filter by time
+          // Time filter
           final withinTimeLimit = game.estimatedTimeMinutes <= _maxTime.value;
 
-          // Filter by search query if any
-          bool matchesSearch = true;
-          if (_searchController.text.isNotEmpty) {
-            matchesSearch =
-                game.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-                game.description.toLowerCase().contains(_searchController.text.toLowerCase());
-          }
-
-          return hasEnoughPlayers && withinTimeLimit && matchesSearch;
+          return matchesSearch && hasEnoughPlayers && withinTimeLimit;
         }).toList();
+  }
+
+  // New method to search games using Gemini API
+  Future<void> _searchGamesWithGemini() async {
+    debugPrint('===== SEARCHING WITH GEMINI =====');
+    debugPrint('Search method called with query: "${_searchController.text}"');
+
+    if (_searchController.text.isEmpty) {
+      Get.snackbar(
+        'Search Required',
+        'Please enter a search term',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    _isApiLoading.value = true;
+    _showSuggestions.value = false;
+    _filteredGames.clear(); // Clear previous results
+
+    try {
+      // Get the search query
+      String searchQuery = _searchController.text;
+      debugPrint('Starting search for: "$searchQuery"');
+
+      // Create a direct instance of the GeminiApiService to access and print API details
+      final geminiApiService = GeminiApiService();
+
+      // Print the API URL
+      debugPrint('===== GEMINI API URL =====');
+      debugPrint(geminiApiService.apiUrl);
+      debugPrint('===== END API URL =====');
+
+      // Try direct API call first to debug if controller is the issue
+      debugPrint('===== MAKING DIRECT API CALL =====');
+      final directApiGames = await geminiApiService.getGames(category: searchQuery);
+      debugPrint('Direct API call returned ${directApiGames.length} games');
+
+      // Now call the Gemini API with the search query through the controller
+      debugPrint('===== MAKING CONTROLLER API CALL =====');
+      await _geminiController.getGamesByCategory(searchQuery);
+      debugPrint('Controller API call completed');
+
+      // Print API details to console
+      debugPrint('===== SEARCH QUERY =====');
+      debugPrint('Query: $searchQuery');
+      debugPrint('===== END SEARCH QUERY =====');
+
+      // Display a snackbar to show that API details are available
+      Get.snackbar(
+        'API Details Available',
+        'API URL, prompt, and response printed to console. Tap the code button in the app bar to view details.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.blue,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+
+      // For diagnostic purposes
+      debugPrint('Controller has ${_geminiController.games.length} games after API call');
+
+      // Filter results based on player count and time if needed
+      _filteredGames.value =
+          _geminiController.games.isEmpty
+              ? directApiGames
+              : _geminiController.games.where((game) {
+                // Player filter
+                final hasEnoughPlayers =
+                    game.minPlayers <= _minPlayers.value && game.maxPlayers >= _minPlayers.value;
+
+                // Time filter
+                final withinTimeLimit = game.estimatedTimeMinutes <= _maxTime.value;
+
+                return hasEnoughPlayers && withinTimeLimit;
+              }).toList();
+
+      // Display results count for diagnosis
+      debugPrint('Filtered games count: ${_filteredGames.length}');
+
+      if (_filteredGames.isEmpty && directApiGames.isNotEmpty) {
+        // If direct API call has games but they're filtered out or controller failed
+        debugPrint('Using direct API results as fallback');
+        _filteredGames.value = directApiGames;
+
+        Get.snackbar(
+          'Controller Issue',
+          'Using direct API results instead. This indicates a potential controller issue.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      } else if (_filteredGames.isEmpty && _geminiController.games.isNotEmpty) {
+        // If we have games but they're filtered out, show a message
+        Get.snackbar(
+          'No Matches',
+          'Games found, but none match your filters. Try adjusting your filters.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else if (_filteredGames.isEmpty) {
+        // If no games at all, show a different message
+        Get.snackbar(
+          'No Results',
+          'No games found for "${_searchController.text}". Try a different search term.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar(
+          'Search Complete',
+          'Found ${_filteredGames.length} games matching "${_searchController.text}"',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      debugPrint('===== ERROR DURING SEARCH =====');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error details: $e');
+
+      Get.snackbar(
+        'Error',
+        'Failed to search games: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+
+      // Log the error for debugging
+      debugPrint('Error searching games: $e');
+    } finally {
+      _isApiLoading.value = false;
+      debugPrint('===== SEARCH COMPLETED =====');
+    }
   }
 
   @override
@@ -226,6 +380,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Obx(() {
+          if (_isGeminiMode.value) {
+            return Text(
+              'Gemini Search',
+              style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            );
+          }
+
           if (_filteredCategories.isEmpty) {
             return Text(
               'Game Categories',
@@ -239,7 +400,46 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           );
         }),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Get.back()),
-        actions: const [ThemeToggle(), SizedBox(width: 8)],
+        actions: [
+          // Display API Response button only in Gemini Mode
+          Obx(
+            () =>
+                _isGeminiMode.value
+                    ? Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          // Create an instance of GeminiApiService
+                          final geminiApiService = GeminiApiService();
+                          // Call the printLastApiResponse method
+                          geminiApiService.printLastApiResponse();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.code, size: 20, color: Colors.blue),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'API',
+                                style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                    : const SizedBox.shrink(),
+          ),
+          const ThemeToggle(),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Obx(() {
         final isDarkMode = _themeController.isDarkMode;
@@ -254,8 +454,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  // Search field
+                  // Search field with clear button
                   Expanded(
+                    flex: 3,
                     child: Container(
                       height: 50,
                       decoration: BoxDecoration(
@@ -265,13 +466,22 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       child: TextField(
                         controller: _searchController,
                         onChanged: (value) {
-                          _updateFilteredGames();
+                          // Only update for non-Gemini mode
+                          if (!_isGeminiMode.value) {
+                            _updateFilteredGames();
+                          }
                         },
                         onSubmitted: (value) {
                           _showSuggestions.value = false;
+                          if (_isGeminiMode.value && value.isNotEmpty) {
+                            _searchGamesWithGemini();
+                          } else if (!_isGeminiMode.value) {
+                            _updateFilteredGames();
+                          }
                         },
                         decoration: InputDecoration(
-                          hintText: 'Search games...',
+                          hintText:
+                              _isGeminiMode.value ? 'Search with Gemini...' : 'Search games...',
                           prefixIcon: const Icon(Icons.search),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -282,7 +492,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                     onPressed: () {
                                       _searchController.clear();
                                       _showSuggestions.value = false;
-                                      _updateFilteredGames();
+                                      if (!_isGeminiMode.value) {
+                                        _updateFilteredGames();
+                                      }
                                     },
                                   )
                                   : null,
@@ -291,7 +503,93 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     ),
                   ),
 
-                  const SizedBox(width: 16),
+                  // Search button (only in Gemini mode)
+                  if (_isGeminiMode.value) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            if (_searchController.text.isNotEmpty) {
+                              // Debug print to confirm button tap
+                              debugPrint(
+                                'Main search button tapped. Searching for: ${_searchController.text}',
+                              );
+                              _searchGamesWithGemini();
+                            } else {
+                              Get.snackbar(
+                                'Search Required',
+                                'Please enter a search term',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(25),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: [
+                                Icon(Icons.search, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Search',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(width: 8),
+
+                  // Always visible search button - next to filter
+                  Container(
+                    height: 50,
+                    width: 50,
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        if (_searchController.text.isNotEmpty) {
+                          // Debug print to confirm button tap
+                          debugPrint(
+                            'Icon search button tapped. Searching for: ${_searchController.text}',
+                          );
+                          if (_isGeminiMode.value) {
+                            _searchGamesWithGemini();
+                          } else {
+                            _updateFilteredGames();
+                            // Also hide suggestions
+                            _showSuggestions.value = false;
+                          }
+                        } else {
+                          Get.snackbar(
+                            'Search Required',
+                            'Please enter a search term',
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                        }
+                      },
+                      icon: Icon(Icons.search, color: colorScheme.primary),
+                      tooltip: 'Search',
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
 
                   // Filter button
                   Container(
@@ -343,7 +641,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                     onTap: () {
                                       _searchController.text = suggestion;
                                       _showSuggestions.value = false;
-                                      _updateFilteredGames();
+                                      if (_isGeminiMode.value) {
+                                        _searchGamesWithGemini();
+                                      } else {
+                                        _updateFilteredGames();
+                                      }
                                     },
                                     borderRadius: BorderRadius.circular(30),
                                     child: Container(
@@ -395,8 +697,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       : const SizedBox.shrink(),
             ),
 
-            // Category tabs - only show if we have filtered categories
-            if (_filteredCategories.isNotEmpty) ...[
+            // Category tabs - only show if we have filtered categories and not in Gemini mode
+            if (_filteredCategories.isNotEmpty && !_isGeminiMode.value) ...[
               SizedBox(
                 height: 50,
                 child: ListView.builder(
@@ -446,41 +748,80 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Game grid or empty state
+            // Loading indicator
+            Obx(
+              () =>
+                  _isApiLoading.value
+                      ? const SizedBox.shrink() // We'll handle this in the expanded section below
+                      : const SizedBox.shrink(),
+            ),
+
+            // Show games list or empty state
             Expanded(
               child: Obx(() {
-                if (_filteredCategories.isEmpty) {
-                  return _buildNoCategories(isDarkMode);
-                }
-
-                if (_filteredGames.isEmpty) {
-                  return _buildEmptyState(isDarkMode, colorScheme, currentCategory!);
-                }
-
-                return AnimationLimiter(
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 0.8,
-                    ),
-                    itemCount: _filteredGames.length,
-                    itemBuilder: (context, index) {
-                      final game = _filteredGames[index];
-
-                      return AnimationConfiguration.staggeredGrid(
-                        position: index,
-                        duration: const Duration(milliseconds: 375),
-                        columnCount: 2,
-                        child: ScaleAnimation(
-                          child: FadeInAnimation(child: _buildGameCard(game, context, isDarkMode)),
+                if (_isApiLoading.value) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: Theme.of(context).primaryColor),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Searching with Gemini...',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Colors.black54,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'This may take a few seconds',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white54 : Colors.black38,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (_filteredCategories.isEmpty && !_isGeminiMode.value) {
+                  return _buildNoCategories(isDarkMode);
+                } else if (_filteredGames.isEmpty &&
+                    _searchController.text.isNotEmpty &&
+                    _isGeminiMode.value) {
+                  // No results after search
+                  return _buildEmptyState(isDarkMode);
+                } else if (_filteredGames.isEmpty && _isGeminiMode.value) {
+                  // Empty starting state for Gemini mode
+                  return _buildGeminiSearchPrompt(isDarkMode, colorScheme);
+                } else if (_filteredGames.isEmpty) {
+                  // Regular empty state
+                  return _buildEmptyState(isDarkMode);
+                } else {
+                  // Results to display
+                  return _isGeminiMode.value
+                      ? ListView.builder(
+                        itemCount: _filteredGames.length,
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                        itemBuilder:
+                            (context, index) =>
+                                _buildGameListItem(_filteredGames[index], context, isDarkMode),
+                      )
+                      : GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.75,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        itemCount: _filteredGames.length,
+                        itemBuilder:
+                            (context, index) =>
+                                _buildGameCard(_filteredGames[index], context, isDarkMode),
                       );
-                    },
-                  ),
-                );
+                }
               }),
             ),
           ],
@@ -489,35 +830,319 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
-  Widget _buildNoCategories(bool isDarkMode) {
+  // New widget for Gemini search prompt
+  Widget _buildGeminiSearchPrompt(bool isDarkMode, ColorScheme colorScheme) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.category_outlined,
-              size: 64,
-              color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(color: Colors.blue.shade100, shape: BoxShape.circle),
+              child: Icon(Icons.smart_toy_outlined, size: 40, color: Colors.blue.shade700),
             ),
             const SizedBox(height: 24),
             Text(
-              'No categories available',
+              "Search with Gemini",
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black87,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Enter a search term above and press either of the search buttons to find games using the Gemini API.",
+              style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("1.", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.search, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Enter a search term in the field at the top",
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("2.", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.search, color: Colors.white, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              "SEARCH",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Click a Search button",
+                        style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 32),
+                      Text("•", style: TextStyle(fontSize: 20, color: colorScheme.primary)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.search, color: Colors.white, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              "SEARCH",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text("Main search button", style: TextStyle(fontSize: 14)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 32),
+                      Text("•", style: TextStyle(fontSize: 20, color: colorScheme.primary)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colorScheme.primary),
+                        ),
+                        child: Icon(Icons.search, color: colorScheme.primary, size: 16),
+                      ),
+                      const SizedBox(width: 8),
+                      Text("Search icon button", style: TextStyle(fontSize: 14)),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'The selected categories have been removed',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
+            const SizedBox(height: 32),
+            OutlinedButton.icon(
+              onPressed: () {
+                // Focus on the search field
+                FocusScope.of(context).requestFocus(FocusNode());
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text("Start Typing to Search"),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // New method to build list item for Gemini mode
+  Widget _buildGameListItem(Game game, BuildContext context, bool isDarkMode) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: InkWell(
+        onTap: () {
+          Get.toNamed(AppRoutes.GAME_DETAILS, arguments: game);
+        },
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Game image
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(width: 100, height: 100, child: _buildGameImage(game.imageUrl)),
+              ),
+
+              const SizedBox(width: 12),
+
+              // Game details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      game.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    // Description
+                    Text(
+                      game.description,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDarkMode ? Colors.white70 : Colors.black87,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Game metadata row
+                    Row(
+                      children: [
+                        // Category tag
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            game.category,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        // Players count
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${game.minPlayers}-${game.maxPlayers}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode ? Colors.white70 : Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        // Time duration
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.timer_outlined,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${game.estimatedTimeMinutes} min',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode ? Colors.white70 : Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoCategories(bool isDarkMode) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.category_outlined,
+              size: 64,
+              color: isDarkMode ? Colors.white38 : Colors.black38,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "No categories available",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "The selected categories have been removed",
+              style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -531,7 +1156,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
         onTap: () {
-          _currentCategoryIndex.value = _controller.categories.indexWhere(
+          _currentCategoryIndex.value = _categoryController.categories.indexWhere(
             (c) => c.id == category.id,
           );
           _updateFilteredGames();
@@ -592,7 +1217,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        onTap: () => Get.toNamed(Routes.GAME_DETAILS, arguments: game),
+        onTap: () => Get.toNamed(AppRoutes.GAME_DETAILS, arguments: game),
         borderRadius: BorderRadius.circular(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,7 +1231,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     topLeft: Radius.circular(16),
                     topRight: Radius.circular(16),
                   ),
-                  image: DecorationImage(image: AssetImage(game.imageUrl), fit: BoxFit.cover),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
+                  child: _buildGameImage(game.imageUrl),
                 ),
               ),
             ),
@@ -652,52 +1283,92 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
-  Widget _buildEmptyState(bool isDarkMode, ColorScheme colorScheme, GameCategory category) {
+  // Widget to display when no games match the filters
+  Widget _buildEmptyState(bool isDarkMode) {
+    final bool isSearchResults = _searchController.text.isNotEmpty;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.search_off,
+              isSearchResults ? Icons.search_off : Icons.category_outlined,
               size: 64,
-              color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
+              color: isDarkMode ? Colors.white38 : Colors.black38,
             ),
             const SizedBox(height: 24),
             Text(
-              'No games found',
+              isSearchResults ? "No results" : "No categories available",
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black87,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Try adjusting your filters or search for different games',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
-              ),
             ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () {
-                _minPlayers.value = 1;
-                _maxTime.value = 60;
-                _searchController.clear();
-                _updateFilteredGames();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
-              child: const Text('Reset All Filters'),
+            const SizedBox(height: 16),
+            Text(
+              isSearchResults
+                  ? "No games found for \"${_searchController.text}\". Try a different search term."
+                  : "The selected categories have been removed",
+              style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
+              textAlign: TextAlign.center,
             ),
+            if (_isGeminiMode.value && !isSearchResults) ...[
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.arrow_upward, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Enter a search term and click a Search button",
+                    style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  Text(
+                    "You can use either the main Search button or the Search icon",
+                    style: TextStyle(color: Colors.blue.shade700, fontSize: 13),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 24),
+            if (isSearchResults && _isGeminiMode.value)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _searchGamesWithGemini,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text("Try Again"),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _searchController.clear();
+                      _filteredGames.clear();
+                    },
+                    icon: const Icon(Icons.clear),
+                    label: const Text("Clear Search"),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
@@ -957,6 +1628,80 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         return Icons.speed_rounded;
       default:
         return Icons.extension_rounded;
+    }
+  }
+
+  // Method to reset all filters
+  void _resetFilters() {
+    _minPlayers.value = 1;
+    _maxTime.value = 60;
+    _searchController.clear();
+    _updateFilteredGames();
+  }
+
+  // Helper method to build game image from URL or asset
+  Widget _buildGameImage(String imageUrl) {
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      // Remote image from URL
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+            ),
+          );
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+          return Center(
+            child: CircularProgressIndicator(
+              value:
+                  loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                      : null,
+            ),
+          );
+        },
+      );
+    } else if (imageUrl.startsWith('assets/')) {
+      // Local asset image
+      return Image.asset(
+        imageUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+            ),
+          );
+        },
+      );
+    } else {
+      // Fallback to placeholder image
+      return Image.asset(
+        'assets/images/placeholder.svg',
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+            ),
+          );
+        },
+      );
     }
   }
 }

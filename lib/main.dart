@@ -3,14 +3,11 @@ import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'app/controllers/app_controller.dart';
-import 'app/controllers/leaderboard_controller.dart';
-import 'app/controllers/navigation_controller.dart';
-import 'app/controllers/theme_controller.dart';
-import 'app/controllers/timer_controller.dart';
+import 'app/controllers/bindings/main_binding.dart';
 import 'app/data/models/game_model.dart';
 import 'app/data/models/leaderboard_entry_model.dart';
 import 'app/data/providers/game_provider.dart';
+import 'app/data/providers/gemini_game_provider.dart';
 import 'app/data/providers/leaderboard_provider.dart';
 import 'app/routes/app_pages.dart';
 import 'app/themes/app_theme.dart';
@@ -26,24 +23,18 @@ Future<void> main() async {
   Hive.registerAdapter(GameAdapter());
   Hive.registerAdapter(LeaderboardEntryAdapter());
 
-  // Initialize services
-  await initServices();
+  // Initialize providers
+  await initProviders();
 
   runApp(const MyApp());
 }
 
-// Initialize services for dependency injection
-Future<void> initServices() async {
+// Initialize providers for dependency injection
+Future<void> initProviders() async {
   // Initialize providers
-  final gameProvider = await Get.putAsync(() => GameProvider().init());
-  final leaderboardProvider = await Get.putAsync(() => LeaderboardProvider().init());
-
-  // Initialize controllers
-  Get.put(ThemeController());
-  Get.put(AppController());
-  Get.put(LeaderboardController());
-  Get.put(TimerController());
-  Get.put(NavigationController());
+  await Get.putAsync(() => GameProvider().init());
+  await Get.putAsync(() => GeminiGameProvider().init());
+  await Get.putAsync(() => LeaderboardProvider().init());
 }
 
 class MyApp extends StatelessWidget {
@@ -51,20 +42,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeController themeController = Get.find<ThemeController>();
-
-    return Obx(
-      () => GetMaterialApp(
-        title: 'Activity Game Hub',
-        theme: AppTheme.getLightTheme(),
-        darkTheme: AppTheme.getDarkTheme(),
-        themeMode: themeController.themeMode.value,
-        initialRoute: AppPages.INITIAL,
-        getPages: AppPages.routes,
-        debugShowCheckedModeBanner: false,
-        defaultTransition: Transition.cupertino,
-        transitionDuration: AppTheme.mediumAnimationDuration,
-      ),
+    return GetMaterialApp(
+      title: 'Activity Game Hub',
+      theme: AppTheme.getLightTheme(),
+      darkTheme: AppTheme.getDarkTheme(),
+      themeMode: ThemeMode.system,
+      initialRoute: AppPages.INITIAL,
+      getPages: AppPages.routes,
+      debugShowCheckedModeBanner: false,
+      defaultTransition: Transition.cupertino,
+      transitionDuration: AppTheme.mediumAnimationDuration,
+      initialBinding: MainBinding(),
     );
   }
 }
@@ -91,13 +79,21 @@ class GameAdapter extends TypeAdapter<Game> {
       estimatedTimeMinutes: fields[7] as int,
       instructions: (fields[8] as List).cast<String>(),
       isFeatured: fields[9] as bool,
+      difficultyLevel: fields[10] as String? ?? 'Easy',
+      materialsRequired: fields[11] != null ? (fields[11] as List).cast<String>() : <String>[],
+      gameType: fields[12] as String? ?? 'Indoor',
+      rating: fields[13] != null ? (fields[13] as num).toDouble() : 3.0,
+      isTimeBound: fields[14] as bool? ?? false,
+      teamBased: fields[15] as bool? ?? false,
+      rules: fields[16] != null ? (fields[16] as List).cast<String>() : <String>[],
+      howToPlay: fields[17] as String? ?? '',
     );
   }
 
   @override
   void write(BinaryWriter writer, Game obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -117,7 +113,23 @@ class GameAdapter extends TypeAdapter<Game> {
       ..writeByte(8)
       ..write(obj.instructions)
       ..writeByte(9)
-      ..write(obj.isFeatured);
+      ..write(obj.isFeatured)
+      ..writeByte(10)
+      ..write(obj.difficultyLevel)
+      ..writeByte(11)
+      ..write(obj.materialsRequired)
+      ..writeByte(12)
+      ..write(obj.gameType)
+      ..writeByte(13)
+      ..write(obj.rating)
+      ..writeByte(14)
+      ..write(obj.isTimeBound)
+      ..writeByte(15)
+      ..write(obj.teamBased)
+      ..writeByte(16)
+      ..write(obj.rules)
+      ..writeByte(17)
+      ..write(obj.howToPlay);
   }
 }
 

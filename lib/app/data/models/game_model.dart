@@ -34,6 +34,30 @@ class Game {
   @HiveField(9)
   final bool isFeatured;
 
+  @HiveField(10)
+  final String difficultyLevel; // Easy, Medium, Hard
+
+  @HiveField(11)
+  final List<String> materialsRequired; // Items needed for the game
+
+  @HiveField(12)
+  final String gameType; // Indoor, Outdoor, Desk-based
+
+  @HiveField(13)
+  final double rating; // Average rating of the game
+
+  @HiveField(14)
+  final bool isTimeBound; // Whether the game has a time limit
+
+  @HiveField(15)
+  final bool teamBased; // Whether it's a team-based game
+
+  @HiveField(16)
+  final List<String> rules; // List of rules for the game
+
+  @HiveField(17)
+  final String howToPlay; // Detailed explanation of how to play
+
   Game({
     required this.id,
     required this.name,
@@ -45,6 +69,14 @@ class Game {
     required this.estimatedTimeMinutes,
     required this.instructions,
     this.isFeatured = false,
+    required this.difficultyLevel,
+    required this.materialsRequired,
+    required this.gameType,
+    required this.rating,
+    required this.isTimeBound,
+    required this.teamBased,
+    required this.rules,
+    required this.howToPlay,
   });
 
   // Factory constructor to create a Game from a Map
@@ -60,6 +92,14 @@ class Game {
       estimatedTimeMinutes: json['estimatedTimeMinutes'] as int,
       instructions: List<String>.from(json['instructions']),
       isFeatured: json['isFeatured'] as bool? ?? false,
+      difficultyLevel: json['difficultyLevel'] as String,
+      materialsRequired: List<String>.from(json['materialsRequired']),
+      gameType: json['gameType'] as String,
+      rating: (json['rating'] as num).toDouble(),
+      isTimeBound: json['isTimeBound'] as bool,
+      teamBased: json['teamBased'] as bool,
+      rules: List<String>.from(json['rules']),
+      howToPlay: json['howToPlay'] as String,
     );
   }
 
@@ -76,6 +116,14 @@ class Game {
       'estimatedTimeMinutes': estimatedTimeMinutes,
       'instructions': instructions,
       'isFeatured': isFeatured,
+      'difficultyLevel': difficultyLevel,
+      'materialsRequired': materialsRequired,
+      'gameType': gameType,
+      'rating': rating,
+      'isTimeBound': isTimeBound,
+      'teamBased': teamBased,
+      'rules': rules,
+      'howToPlay': howToPlay,
     };
   }
 }

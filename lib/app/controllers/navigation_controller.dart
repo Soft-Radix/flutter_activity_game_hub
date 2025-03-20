@@ -9,10 +9,10 @@ class NavigationController extends GetxController {
 
   // List of main routes
   final List<String> routes = [
-    Routes.HOME,
-    Routes.RANDOM_PICKER,
-    Routes.LEADERBOARD,
-    Routes.SETTINGS,
+    AppRoutes.HOME,
+    AppRoutes.RANDOM_PICKER,
+    AppRoutes.LEADERBOARD,
+    AppRoutes.SETTINGS,
   ];
 
   @override

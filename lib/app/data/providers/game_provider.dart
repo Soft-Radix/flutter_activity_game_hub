@@ -75,25 +75,6 @@ class GameProvider extends GetxService {
     final sampleGames = [
       Game(
         id: randomAlphaNumeric(10),
-        name: 'Two Truths and a Lie',
-        description:
-            'Each person shares three statements about themselves - two true and one false. The group tries to guess which statement is the lie.',
-        category: 'Icebreakers',
-        imageUrl: 'assets/images/placeholder.svg',
-        minPlayers: 3,
-        maxPlayers: 20,
-        estimatedTimeMinutes: 15,
-        instructions: [
-          'Each player thinks of two true statements and one false statement about themselves',
-          'One by one, players share their three statements in random order',
-          'The group discusses and votes on which statement they believe is the lie',
-          'The player reveals which statement was the lie',
-          'Continue until everyone has had a turn',
-        ],
-        isFeatured: true,
-      ),
-      Game(
-        id: randomAlphaNumeric(10),
         name: 'Office Pictionary',
         description: 'Teams take turns drawing and guessing office-related terms to earn points.',
         category: 'Team-Building',
@@ -110,6 +91,16 @@ class GameProvider extends GetxService {
           'The team with the most points at the end wins',
         ],
         isFeatured: false,
+        difficultyLevel: 'Easy',
+        materialsRequired: ['Paper', 'Pencils'],
+        gameType: 'Team-Building',
+        rating: 4.5,
+        isTimeBound: true,
+        teamBased: true,
+        rules: [
+          'Each team has a designated drawing area',
+        ],
+        howToPlay: 'Each team has a designated drawing area',
       ),
       Game(
         id: randomAlphaNumeric(10),
@@ -130,6 +121,14 @@ class GameProvider extends GetxService {
           'The last player remaining wins',
         ],
         isFeatured: false,
+        difficultyLevel: 'Easy',
+        materialsRequired: ['Paper', 'Pencils'],
+        gameType: 'Brain Games',
+        rating: 4.5,
+        isTimeBound: true,
+        teamBased: true,
+        rules: [],
+        howToPlay: 'Each team has a designated drawing area',
       ),
       Game(
         id: randomAlphaNumeric(10),
@@ -149,6 +148,22 @@ class GameProvider extends GetxService {
           'The team with the most points at the end wins',
         ],
         isFeatured: true,
+        difficultyLevel: 'Easy',
+        materialsRequired: ['Paper', 'Pencils'],
+        gameType: 'Quick Games',
+        rating: 4.5,
+        isTimeBound: true,
+        teamBased: true,
+        rules: [
+          'Each team has a designated drawing area',
+          'The drawing area should be large enough for the team to draw comfortably',
+          'The drawing area should be clearly marked',
+          'The drawing area should be well-lit',
+          'The drawing area should be well-ventilated',
+          'The drawing area should be well-ventilated',
+          
+        ],
+        howToPlay: 'Each team has a designated drawing area',
       ),
     ];
 

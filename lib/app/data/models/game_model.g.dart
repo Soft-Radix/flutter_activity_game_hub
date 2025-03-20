@@ -27,6 +27,14 @@ class GameAdapter extends TypeAdapter<Game> {
       estimatedTimeMinutes: fields[7] as int,
       instructions: (fields[8] as List).cast<String>(),
       isFeatured: fields[9] as bool,
+      difficultyLevel: fields[10] as String,
+      materialsRequired: (fields[11] as List).cast<String>(),
+      gameType: fields[12] as String,
+      rating: fields[13] as double,
+      isTimeBound: fields[14] as bool,
+      teamBased: fields[15] as bool,
+      rules: (fields[16] as List).cast<String>(),
+      howToPlay: fields[17] as String,
     );
   }
 
@@ -53,7 +61,23 @@ class GameAdapter extends TypeAdapter<Game> {
       ..writeByte(8)
       ..write(obj.instructions)
       ..writeByte(9)
-      ..write(obj.isFeatured);
+      ..write(obj.isFeatured)
+      ..writeByte(10)
+      ..write(obj.difficultyLevel)
+      ..writeByte(11)
+      ..write(obj.materialsRequired)
+      ..writeByte(12)
+      ..write(obj.gameType)
+      ..writeByte(13)
+      ..write(obj.rating)
+      ..writeByte(14)
+      ..write(obj.isTimeBound)
+      ..writeByte(15)
+      ..write(obj.teamBased)
+      ..writeByte(16)
+      ..write(obj.rules)
+      ..writeByte(17)
+      ..write(obj.howToPlay);
   }
 
   @override
