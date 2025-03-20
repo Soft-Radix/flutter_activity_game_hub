@@ -31,45 +31,53 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   final RxBool _showSuggestions = false.obs;
 
   final List<String> _dummySuggestions = [
-  'Team building',
-  'Ice breakers',
-  'Quick games',
-  'Large group activities',
-  'Indoor games',
-  'Outdoor activities',
-  'No materials needed',
-  'Games for kids',
-  'Games for adults',
-  'Party games',
-  'Strategy games',
-  'Communication games',
-  'Problem-solving activities',
-  'Brain teasers',
-  'Trivia challenges',
-  'Speed games',
-  'Creativity boosters',
-  'Collaboration exercises',
-  'Memory games',
-  'Word association games',
-  'Role-playing activities',
-  'Trust-building games',
-  'Observation challenges',
-  'Physical activity games',
-  'Mindfulness and relaxation games',
-  'Virtual team games',
-  'Puzzle-solving activities',
-  'Leadership challenges',
-  'Guessing games',
-  'Fun competitive games',
-  'Hidden object games',
-  'Drawing and sketching games',
-  'Music and rhythm games',
-  'Emoji-based games',
-  'Debate and discussion games',
-  'Improvisation exercises',
-  'Coding-related mini-games (for tech teams)',
-  'Scavenger hunts',
-];
+    'Team building',
+    'Ice breakers',
+    'Quick games',
+    'Large group activities',
+    'Indoor games',
+    'Outdoor activities',
+    'No materials needed',
+    'Games for kids',
+    'Games for adults',
+    'Party games',
+    'Strategy games',
+    'Communication games',
+    'Problem-solving activities',
+    'Brain teasers',
+    'Trivia challenges',
+    'Speed games',
+    'Creativity boosters',
+    'Collaboration exercises',
+    'Memory games',
+    'Word association games',
+    'Role-playing activities',
+    'Trust-building games',
+    'Observation challenges',
+    'Physical activity games',
+    'Mindfulness and relaxation games',
+    'Virtual team games',
+    'Puzzle-solving activities',
+    'Leadership challenges',
+    'Guessing games',
+    'Fun competitive games',
+    'Hidden object games',
+    'Drawing and sketching games',
+    'Music and rhythm games',
+    'Emoji-based games',
+    'Debate and discussion games',
+    'Improvisation exercises',
+    'Coding-related mini-games (for tech teams)',
+    'Scavenger hunts',
+  ];
+
+  // List of category IDs to exclude from display
+  final List<String> _excludedCategories = [
+    'brain-games',
+    'quick-games',
+    'icebreakers',
+    'team-building',
+  ];
 
   // Filtered categories list - change from getter to property
   final RxList<GameCategory> _filteredCategories = <GameCategory>[].obs;
@@ -112,6 +120,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   void _refreshFilteredCategories() {
     // Ensure categories are properly filtered
+    _filteredCategories.value =
+        _controller.categories
+            .where((category) => !_excludedCategories.contains(category.id))
+            .toList();
 
     // If we have no categories after filtering or current index is out of bounds
     if (_filteredCategories.isEmpty || _currentCategoryIndex.value >= _filteredCategories.length) {
@@ -210,9 +222,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-
-    // Print the current categories for debugging
-    print('Current filtered categories: ${_filteredCategories.map((c) => c.id).toList()}');
 
     return Scaffold(
       appBar: AppBar(
@@ -388,7 +397,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
             // Category tabs - only show if we have filtered categories
             if (_filteredCategories.isNotEmpty) ...[
-              // Debug output
               SizedBox(
                 height: 50,
                 child: ListView.builder(
@@ -397,9 +405,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   itemCount: _filteredCategories.length,
                   itemBuilder: (context, index) {
                     final category = _filteredCategories[index];
-
                     final isSelected = _currentCategoryIndex.value == index;
-                    debugPrint('Building category tab: ${category.id} - ${category.name}');
 
                     return GestureDetector(
                       onTap: () {
