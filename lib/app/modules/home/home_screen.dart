@@ -1,4 +1,3 @@
-import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:get/get.dart';
@@ -9,8 +8,8 @@ import '../../controllers/theme_controller.dart';
 import '../../routes/app_pages.dart';
 import '../../themes/app_theme.dart';
 import '../../widgets/theme_toggle.dart';
+import 'widgets/activity_suggestion_card.dart';
 import 'widgets/category_card.dart';
-import 'widgets/chatgpt_suggestion_card.dart';
 import 'widgets/featured_game_card.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -42,8 +41,6 @@ class HomeScreen extends StatelessWidget {
                   color: colorScheme.primary,
                   onRefresh: () async {
                     await controller.loadGames();
-                    await controller.getGameSuggestion();
-                    await controller.getGameOfTheDay();
                   },
                   child: AnimationLimiter(
                     child: ListView(
@@ -60,44 +57,14 @@ class HomeScreen extends StatelessWidget {
                           _buildWelcomeMessage(context),
                           const SizedBox(height: AppTheme.padding),
 
-                          // ChatGPT Suggestion Box
-                          ChatGptSuggestionCard(
-                            onRefresh: () => controller.getGameSuggestion(),
-                            onSearch: () {
-                              // Show dialog to input search parameters
-                              _showSearchDialog(context, controller);
-                            },
-                          ),
-
-                          // View saved suggestions button
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              onPressed: () => Get.toNamed(Routes.SAVED_SUGGESTIONS),
-                              icon: const Icon(Icons.collections_bookmark),
-                              label: const Text('View All Suggestions'),
-                              style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
-                            ),
-                          ),
+                          // Activity Suggestion Card
+                          const ActivitySuggestionCard(),
                           const SizedBox(height: AppTheme.largePadding),
 
                           // Category Grid Title
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Game Categories',
-                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              TextButton.icon(
-                                onPressed: () {
-                                  // Navigate to Categories screen directly
-                                  Get.toNamed(Routes.CATEGORIES);
-                                },
-                                icon: const Icon(Icons.arrow_forward),
-                                label: const Text('See All'),
-                              ),
-                            ],
+                          Text(
+                            'Game Categories',
+                            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: AppTheme.smallPadding),
 
@@ -153,7 +120,7 @@ class HomeScreen extends StatelessWidget {
                           const SizedBox(height: AppTheme.largePadding),
 
                           // Extra padding at bottom to account for the bottom navigation bar
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 80),
                         ],
                       ),
                     ),
@@ -209,26 +176,19 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              AnimatedTextKit(
-                animatedTexts: [
-                  TypewriterAnimatedText(
-                    'Activity Game Hub',
-                    textStyle: textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withOpacity(0.3),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+              Text(
+                'Activity Game Hub',
+                style: textTheme.displaySmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
-                    speed: const Duration(milliseconds: 100),
-                  ),
-                ],
-                totalRepeatCount: 1,
-                displayFullTextOnTap: true,
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               Container(
@@ -258,9 +218,9 @@ class HomeScreen extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.2,
+        crossAxisSpacing: AppTheme.padding,
+        mainAxisSpacing: AppTheme.padding,
+        childAspectRatio: 1.0,
       ),
       itemCount: controller.categories.length,
       itemBuilder: (context, index) {
@@ -268,140 +228,14 @@ class HomeScreen extends StatelessWidget {
         return CategoryCard(
           category: category,
           onTap: () {
-            // Navigate directly to Categories screen
-            Get.find<AppController>().selectedCategory.value = category;
+            // Set the selected category
+            controller.selectedCategory.value = category;
+
+            // Navigate to the categories screen
             Get.toNamed(Routes.CATEGORIES);
           },
         );
       },
-    );
-  }
-
-  void _showSearchDialog(BuildContext context, AppController controller) {
-    int? players;
-    int? timeMinutes;
-    String? category;
-    String? preferences;
-
-    final themeController = Get.find<ThemeController>();
-    final isDarkMode = themeController.isDarkMode;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
-            ),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.search, color: colorScheme.primary),
-                ),
-                const SizedBox(width: 16),
-                Text('Find a Game', style: Theme.of(context).textTheme.titleLarge),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Number of Players',
-                      hintText: 'E.g., 5',
-                      prefixIcon: const Icon(Icons.people_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                      ),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      if (value.isNotEmpty) {
-                        players = int.tryParse(value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Available Time (minutes)',
-                      hintText: 'E.g., 20',
-                      prefixIcon: const Icon(Icons.timer_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                      ),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      if (value.isNotEmpty) {
-                        timeMinutes = int.tryParse(value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: 'Preferred Category',
-                      prefixIcon: const Icon(Icons.category_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                      ),
-                    ),
-                    items:
-                        controller.categories
-                            .map((cat) => DropdownMenuItem(value: cat.name, child: Text(cat.name)))
-                            .toList(),
-                    onChanged: (value) {
-                      category = value;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Additional Preferences',
-                      hintText: 'E.g., low energy, fun, no materials',
-                      prefixIcon: const Icon(Icons.list_alt_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                      ),
-                    ),
-                    onChanged: (value) {
-                      preferences = value;
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Get.back();
-                  controller.getGameSuggestion(
-                    numberOfPlayers: players,
-                    availableTimeMinutes: timeMinutes,
-                    preferredCategory: category,
-                    additionalPreferences: preferences,
-                  );
-                },
-                icon: const Icon(Icons.search),
-                label: const Text('Search'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  elevation: AppTheme.smallElevation,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-              ),
-            ],
-          ),
     );
   }
 }

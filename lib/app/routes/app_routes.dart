@@ -11,5 +11,4 @@ abstract class Routes {
   static const TIMER_SCOREBOARD = '/timer-scoreboard';
   static const LEADERBOARD = '/leaderboard';
   static const SETTINGS = '/settings';
-  static const SAVED_SUGGESTIONS = '/saved-suggestions';
 }
