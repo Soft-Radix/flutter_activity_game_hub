@@ -3,12 +3,14 @@ import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'app/bindings/app_binding.dart';
 import 'app/controllers/bindings/main_binding.dart';
 import 'app/data/models/game_model.dart';
 import 'app/data/models/leaderboard_entry_model.dart';
 import 'app/data/providers/game_provider.dart';
 import 'app/data/providers/gemini_game_provider.dart';
 import 'app/data/providers/leaderboard_provider.dart';
+import 'app/data/services/featured_game_service.dart';
 import 'app/routes/app_pages.dart';
 import 'app/themes/app_theme.dart';
 
@@ -25,6 +27,28 @@ Future<void> main() async {
 
   // Initialize providers
   await initProviders();
+
+  // Register app bindings
+  AppBinding().dependencies();
+
+  // Debug print the state of the FeaturedGameService
+  try {
+    final service = Get.find<FeaturedGameService>();
+    debugPrint('🔍 FeaturedGameService found successfully: ${service.hashCode}');
+  } catch (e) {
+    debugPrint('❌ FeaturedGameService not found: $e');
+  }
+
+  // Short delay to ensure all services are registered
+  await Future.delayed(const Duration(milliseconds: 100));
+
+  // Try again after delay
+  try {
+    final service = Get.find<FeaturedGameService>();
+    debugPrint('🔍 FeaturedGameService found after delay: ${service.hashCode}');
+  } catch (e) {
+    debugPrint('❌ FeaturedGameService still not found after delay: $e');
+  }
 
   runApp(const MyApp());
 }

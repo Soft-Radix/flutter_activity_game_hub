@@ -7,9 +7,8 @@ import '../../controllers/theme_controller.dart';
 import '../../data/models/category_model.dart';
 import '../../data/models/game_model.dart';
 import '../../data/services/gemini_api_service.dart';
-import '../../routes/app_pages.dart';
-import '../../widgets/theme_toggle.dart';
 import '../../modules/categories/controllers/category_controller.dart';
+import '../../routes/app_pages.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -104,25 +103,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     // Initialize filtered categories using CategoryController
     _refreshFilteredCategories();
 
-    // Check if a specific category was selected
-    if (_categoryController.selectedCategory.value != null) {
-      final selectedCategory = _categoryController.selectedCategory.value!;
-      final index = _filteredCategories.indexWhere((c) => c.id == selectedCategory.id);
-      if (index != -1) {
-        _currentCategoryIndex.value = index;
-      }
-      // Clear the selection after using it
-      _categoryController.clearSelectedCategory();
-    }
-
     // Update navigation controller index
     _navigationController.updateIndex(AppRoutes.CATEGORIES);
 
     // Initialize filtered games
-    _updateFilteredGames();
 
     // Add listener for search suggestions
-    _searchController.addListener(_updateSearchSuggestions);
   }
 
   @override
@@ -134,101 +120,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   void _refreshFilteredCategories() {
-    // Use CategoryController to get filtered categories
-    _filteredCategories.value = _categoryController.filteredCategories;
-
     // If we have no categories after filtering or current index is out of bounds
     if (_filteredCategories.isEmpty || _currentCategoryIndex.value >= _filteredCategories.length) {
       _currentCategoryIndex.value = 0;
       _filteredGames.clear();
     } else {
       // Make sure games are updated based on the current category
-      _updateFilteredGames();
     }
-  }
-
-  void _updateSearchSuggestions() {
-    if (_searchController.text.isEmpty) {
-      _searchSuggestions.clear();
-      _showSuggestions.value = false;
-      return;
-    }
-
-    final query = _searchController.text.toLowerCase();
-
-    // Always show dummy suggestions and "all" option when user types
-    List<String> suggestions = ['All results'];
-
-    // Add dummy suggestions that match the query
-    suggestions.addAll(
-      _dummySuggestions.where((suggestion) => suggestion.toLowerCase().contains(query)),
-    );
-
-    // Use real game data as additional suggestions if any match
-    final allGames = <Game>[];
-    for (final category in _filteredCategories) {
-      allGames.addAll(_categoryController.getGamesByCategory(category.id));
-    }
-
-    final matchedGames =
-        allGames
-            .where(
-              (game) =>
-                  game.name.toLowerCase().contains(query) ||
-                  game.description.toLowerCase().contains(query),
-            )
-            .toList();
-
-    // Add real matching game names to suggestions
-    suggestions.addAll(matchedGames.map((game) => game.name).toSet());
-
-    // Remove duplicates and limit
-    suggestions = suggestions.toSet().toList();
-    if (suggestions.length > 6) {
-      suggestions = suggestions.sublist(0, 6);
-    }
-
-    _searchSuggestions.value = suggestions;
-    _showSuggestions.value = true; // Always show suggestions when text is entered
-  }
-
-  void _updateFilteredGames() async {
-    if (_filteredCategories.isEmpty) {
-      _filteredGames.clear();
-      return;
-    }
-
-    if (_isGeminiMode.value) {
-      // Don't auto-search with Gemini API - wait for the user to press the search button
-      return;
-    }
-
-    // For standard mode, use the existing filtering logic
-    final currentCategory = _filteredCategories[_currentCategoryIndex.value];
-
-    // Use CategoryController to get games for the category
-    List<Game> categoryGames = _categoryController.getGamesForCategory(
-      currentCategory.id,
-      useGemini: _isGeminiMode.value,
-    );
-
-    _filteredGames.value =
-        categoryGames.where((game) {
-          // Search filter
-          final matchesSearch =
-              _searchController.text.isEmpty ||
-              game.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-              game.description.toLowerCase().contains(_searchController.text.toLowerCase());
-
-          // Player filter
-          final hasEnoughPlayers =
-              game.minPlayers <= _minPlayers.value && game.maxPlayers >= _minPlayers.value;
-
-          // Time filter
-          final withinTimeLimit = game.estimatedTimeMinutes <= _maxTime.value;
-
-          return matchesSearch && hasEnoughPlayers && withinTimeLimit;
-        }).toList();
   }
 
   // New method to search games using Gemini API
@@ -367,7 +265,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   @override
   void dispose() {
-    _searchController.removeListener(_updateSearchSuggestions);
     _searchController.dispose();
     super.dispose();
   }
@@ -437,7 +334,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     )
                     : const SizedBox.shrink(),
           ),
-          const ThemeToggle(),
           const SizedBox(width: 8),
         ],
       ),
@@ -451,77 +347,130 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           children: [
             // Search and filter row
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  // Search field with clear button
-                  Expanded(
-                    flex: 3,
-                    child: Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) {
-                          // Only update for non-Gemini mode
-                          if (!_isGeminiMode.value) {
-                            _updateFilteredGames();
-                          }
-                        },
-                        onSubmitted: (value) {
-                          _showSuggestions.value = false;
-                          if (_isGeminiMode.value && value.isNotEmpty) {
-                            _searchGamesWithGemini();
-                          } else if (!_isGeminiMode.value) {
-                            _updateFilteredGames();
-                          }
-                        },
-                        decoration: InputDecoration(
-                          hintText:
-                              _isGeminiMode.value ? 'Search with Gemini...' : 'Search games...',
-                          prefixIcon: const Icon(Icons.search),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          suffixIcon:
-                              _searchController.text.isNotEmpty
-                                  ? IconButton(
-                                    icon: const Icon(Icons.clear),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      _showSuggestions.value = false;
-                                      if (!_isGeminiMode.value) {
-                                        _updateFilteredGames();
-                                      }
-                                    },
-                                  )
-                                  : null,
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Responsive layout based on available width
+                  final bool isNarrowLayout = constraints.maxWidth < 360;
+
+                  return Row(
+                    children: [
+                      // Search field with clear button
+                      Expanded(
+                        flex: 3,
+                        child: Container(
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (value) {
+                              // Only update for non-Gemini mode
+                              if (!_isGeminiMode.value) {}
+                            },
+                            onSubmitted: (value) {
+                              _showSuggestions.value = false;
+                              if (_isGeminiMode.value && value.isNotEmpty) {
+                                _searchGamesWithGemini();
+                              } else if (!_isGeminiMode.value) {}
+                            },
+                            decoration: InputDecoration(
+                              hintText:
+                                  isNarrowLayout
+                                      ? 'Search...'
+                                      : (_isGeminiMode.value
+                                          ? 'Search with Gemini...'
+                                          : 'Search games...'),
+                              prefixIcon: const Icon(Icons.search),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              suffixIcon:
+                                  _searchController.text.isNotEmpty
+                                      ? IconButton(
+                                        icon: const Icon(Icons.clear),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          _showSuggestions.value = false;
+                                          if (!_isGeminiMode.value) {}
+                                        },
+                                      )
+                                      : null,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  // Search button (only in Gemini mode)
-                  if (_isGeminiMode.value) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
+                      // Search button (only in Gemini mode)
+                      if (_isGeminiMode.value && !isNarrowLayout) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                if (_searchController.text.isNotEmpty) {
+                                  _searchGamesWithGemini();
+                                } else {
+                                  Get.snackbar(
+                                    'Search Required',
+                                    'Please enter a search term',
+                                    snackPosition: SnackPosition.BOTTOM,
+                                  );
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(25),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.search, color: Colors.white),
+                                    if (!isNarrowLayout) ...[
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'Search',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(width: 8),
+
+                      // Always visible search button
+                      Container(
+                        height: 50,
+                        width: 50,
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: IconButton(
+                          onPressed: () {
                             if (_searchController.text.isNotEmpty) {
-                              // Debug print to confirm button tap
-                              debugPrint(
-                                'Main search button tapped. Searching for: ${_searchController.text}',
-                              );
-                              _searchGamesWithGemini();
+                              if (_isGeminiMode.value) {
+                                _searchGamesWithGemini();
+                              } else {
+                                _showSuggestions.value = false;
+                              }
                             } else {
                               Get.snackbar(
                                 'Search Required',
@@ -530,80 +479,32 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                               );
                             }
                           },
-                          borderRadius: BorderRadius.circular(25),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              children: [
-                                Icon(Icons.search, color: Colors.white),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Search',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          icon: Icon(Icons.search, color: colorScheme.primary),
+                          tooltip: 'Search',
                         ),
                       ),
-                    ),
-                  ],
 
-                  const SizedBox(width: 8),
+                      const SizedBox(width: 8),
 
-                  // Always visible search button - next to filter
-                  Container(
-                    height: 50,
-                    width: 50,
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: IconButton(
-                      onPressed: () {
-                        if (_searchController.text.isNotEmpty) {
-                          // Debug print to confirm button tap
-                          debugPrint(
-                            'Icon search button tapped. Searching for: ${_searchController.text}',
-                          );
-                          if (_isGeminiMode.value) {
-                            _searchGamesWithGemini();
-                          } else {
-                            _updateFilteredGames();
-                            // Also hide suggestions
-                            _showSuggestions.value = false;
-                          }
-                        } else {
-                          Get.snackbar(
-                            'Search Required',
-                            'Please enter a search term',
-                            snackPosition: SnackPosition.BOTTOM,
-                          );
-                        }
-                      },
-                      icon: Icon(Icons.search, color: colorScheme.primary),
-                      tooltip: 'Search',
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  // Filter button
-                  Container(
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: IconButton(
-                      onPressed: () => _showFiltersDialog(context),
-                      icon: const Icon(Icons.tune),
-                      tooltip: 'Filters',
-                    ),
-                  ),
-                ],
+                      // Filter button
+                      Container(
+                        height: 50,
+                        width: 50,
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: IconButton(
+                          onPressed: () => _showFiltersDialog(context),
+                          icon: const Icon(Icons.tune),
+                          tooltip: 'Filters',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
 
@@ -643,9 +544,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                       _showSuggestions.value = false;
                                       if (_isGeminiMode.value) {
                                         _searchGamesWithGemini();
-                                      } else {
-                                        _updateFilteredGames();
-                                      }
+                                      } else {}
                                     },
                                     borderRadius: BorderRadius.circular(30),
                                     child: Container(
@@ -712,7 +611,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     return GestureDetector(
                       onTap: () {
                         _currentCategoryIndex.value = index;
-                        _updateFilteredGames();
                       },
                       child: Container(
                         margin: const EdgeInsets.only(right: 12),
@@ -747,14 +645,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
               const SizedBox(height: 16),
             ],
-
-            // Loading indicator
-            Obx(
-              () =>
-                  _isApiLoading.value
-                      ? const SizedBox.shrink() // We'll handle this in the expanded section below
-                      : const SizedBox.shrink(),
-            ),
 
             // Show games list or empty state
             Expanded(
@@ -832,161 +722,158 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   // New widget for Gemini search prompt
   Widget _buildGeminiSearchPrompt(bool isDarkMode, ColorScheme colorScheme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(color: Colors.blue.shade100, shape: BoxShape.circle),
-              child: Icon(Icons.smart_toy_outlined, size: 40, color: Colors.blue.shade700),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Search with Gemini",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white70 : Colors.black87,
+    return SingleChildScrollView(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(color: Colors.blue.shade100, shape: BoxShape.circle),
+                child: Icon(Icons.smart_toy_outlined, size: 35, color: Colors.blue.shade700),
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "Enter a search term above and press either of the search buttons to find games using the Gemini API.",
-              style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300),
+              const SizedBox(height: 16),
+              Text(
+                "Search with Gemini",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
               ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text("1.", style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.search, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Enter a search term in the field at the top",
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
+              const SizedBox(height: 12),
+              Text(
+                "Enter a search term above to find games using the Gemini API.",
+                style: TextStyle(fontSize: 15, color: isDarkMode ? Colors.white54 : Colors.black54),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              // Use a responsive container width
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 320),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("2.", style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                      // First step
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
                         child: Row(
                           children: [
-                            Icon(Icons.search, color: Colors.white, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              "SEARCH",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                            Text("1.", style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.search, size: 18),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                "Enter your search",
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Click a Search button",
-                        style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(width: 32),
-                      Text("•", style: TextStyle(fontSize: 20, color: colorScheme.primary)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+
+                      // Second step
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.search, color: Colors.white, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              "SEARCH",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                            Text("2.", style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.search, color: Colors.white, size: 14),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    "SEARCH",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                "Click search",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text("Main search button", style: TextStyle(fontSize: 14)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(width: 32),
-                      Text("•", style: TextStyle(fontSize: 20, color: colorScheme.primary)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: colorScheme.primary),
+
+                      // Search button options
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.circle, size: 8, color: colorScheme.primary),
+                                const SizedBox(width: 6),
+                                Text("Main search button", style: TextStyle(fontSize: 13)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Icon(Icons.circle, size: 8, color: colorScheme.primary),
+                                const SizedBox(width: 6),
+                                Text("Search icon", style: TextStyle(fontSize: 13)),
+                              ],
+                            ),
+                          ],
                         ),
-                        child: Icon(Icons.search, color: colorScheme.primary, size: 16),
                       ),
-                      const SizedBox(width: 8),
-                      Text("Search icon button", style: TextStyle(fontSize: 14)),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            OutlinedButton.icon(
-              onPressed: () {
-                // Focus on the search field
-                FocusScope.of(context).requestFocus(FocusNode());
-              },
-              icon: const Icon(Icons.edit),
-              label: const Text("Start Typing to Search"),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: () {
+                  // Focus on the search field
+                  FocusScope.of(context).requestFocus(FocusNode());
+                },
+                icon: const Icon(Icons.edit, size: 18),
+                label: const Text("Start Typing to Search"),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1155,12 +1042,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
-        onTap: () {
-          _currentCategoryIndex.value = _categoryController.categories.indexWhere(
-            (c) => c.id == category.id,
-          );
-          _updateFilteredGames();
-        },
+        onTap: () {},
         borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -1288,88 +1170,110 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final bool isSearchResults = _searchController.text.isNotEmpty;
 
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSearchResults ? Icons.search_off : Icons.category_outlined,
-              size: 64,
-              color: isDarkMode ? Colors.white38 : Colors.black38,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              isSearchResults ? "No results" : "No categories available",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white70 : Colors.black87,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isSearchResults ? Icons.search_off : Icons.category_outlined,
+                size: 56,
+                color: isDarkMode ? Colors.white38 : Colors.black38,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isSearchResults
-                  ? "No games found for \"${_searchController.text}\". Try a different search term."
-                  : "The selected categories have been removed",
-              style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
-              textAlign: TextAlign.center,
-            ),
-            if (_isGeminiMode.value && !isSearchResults) ...[
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.arrow_upward, color: Colors.blue),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Enter a search term and click a Search button",
-                    style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+              const SizedBox(height: 20),
+              Text(
+                isSearchResults ? "No Games Found" : "No Categories Available",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 280),
+                child: Text(
+                  isSearchResults
+                      ? "Try adjusting your search filters or try a different keyword"
+                      : "The selected categories have been removed",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDarkMode ? Colors.white54 : Colors.black54,
                   ),
-                ],
+                  textAlign: TextAlign.center,
+                ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
-                  const SizedBox(width: 8),
-                  Text(
-                    "You can use either the main Search button or the Search icon",
-                    style: TextStyle(color: Colors.blue.shade700, fontSize: 13),
+              if (_isGeminiMode.value && !isSearchResults) ...[
+                const SizedBox(height: 24),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 250),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.arrow_upward, color: Colors.blue, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Enter a search term above",
+                              style: TextStyle(
+                                color: Colors.blue,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 14, color: Colors.blue.shade700),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Use any search button to find games",
+                              style: TextStyle(color: Colors.blue.shade700, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              if (isSearchResults)
+                // Use a column instead of row for small screens
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _searchGamesWithGemini,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text("Reset All Filters"),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _searchController.clear();
+                        _filteredGames.clear();
+                      },
+                      icon: const Icon(Icons.clear, size: 18),
+                      label: const Text("Clear Search"),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
             ],
-            const SizedBox(height: 24),
-            if (isSearchResults && _isGeminiMode.value)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _searchGamesWithGemini,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text("Try Again"),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _searchController.clear();
-                      _filteredGames.clear();
-                    },
-                    icon: const Icon(Icons.clear),
-                    label: const Text("Clear Search"),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                  ),
-                ],
-              ),
-          ],
+          ),
         ),
       ),
     );
@@ -1597,7 +1501,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     onPressed: () {
                       _minPlayers.value = players.value;
                       _maxTime.value = maxTime.value;
-                      _updateFilteredGames();
                       Get.back();
                     },
                     style: ElevatedButton.styleFrom(
@@ -1636,7 +1539,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     _minPlayers.value = 1;
     _maxTime.value = 60;
     _searchController.clear();
-    _updateFilteredGames();
   }
 
   // Helper method to build game image from URL or asset

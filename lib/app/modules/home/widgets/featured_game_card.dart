@@ -178,6 +178,38 @@ class FeaturedGameCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
 
+                          // Rating display
+                          Row(
+                            children: [
+                              Icon(Icons.star, color: Colors.amber, size: 18),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${game.rating}',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Show difficulty level
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _getDifficultyColor(game.difficultyLevel, isDarkMode),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  game.difficultyLevel,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
                           // Game description
                           Text(
                             game.description,
@@ -281,6 +313,21 @@ class FeaturedGameCard extends StatelessWidget {
               ),
             ),
       );
+    }
+  }
+
+  Color _getDifficultyColor(String difficultyLevel, bool isDarkMode) {
+    // Implement your logic to determine the color based on the difficulty level
+    // For example, you can use a switch statement or a map to return the appropriate color
+    switch (difficultyLevel) {
+      case 'Easy':
+        return Colors.green;
+      case 'Medium':
+        return Colors.amber;
+      case 'Hard':
+        return Colors.red;
+      default:
+        return isDarkMode ? Colors.white : Colors.black87;
     }
   }
 }
