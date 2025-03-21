@@ -24,7 +24,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   final NavigationController _navigationController = Get.find<NavigationController>();
   final RxInt _currentCategoryIndex = 0.obs;
   final RxList<Game> _filteredGames = <Game>[].obs;
-  final RxInt _minPlayers = 1.obs;
+  final RxInt _minPlayers = 15.obs;
   final RxInt _maxTime = 60.obs;
   final TextEditingController _searchController = TextEditingController();
   final RxBool _isSearching = false.obs;
@@ -160,19 +160,42 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       debugPrint(geminiApiService.apiUrl);
       debugPrint('===== END API URL =====');
 
-      // Try direct API call first to debug if controller is the issue
-      debugPrint('===== MAKING DIRECT API CALL =====');
-      final directApiGames = await geminiApiService.getGames(category: searchQuery);
+      // Try direct API call first with filter parameters
+      debugPrint('===== MAKING DIRECT API CALL WITH FILTERS =====');
+      final directApiGames = await geminiApiService.getGames(
+        category: searchQuery,
+        minPlayers: _minPlayers.value, // Pass the filter value directly
+        maxPlayers: _minPlayers.value, // Use min players for max to ensure compatibility
+        maxTimeMinutes: _maxTime.value, // Pass the filter value directly
+      );
       debugPrint('Direct API call returned ${directApiGames.length} games');
 
-      // Now call the Gemini API with the search query through the controller
-      debugPrint('===== MAKING CONTROLLER API CALL =====');
-      await _geminiController.getGamesByCategory(searchQuery);
+      // Now call the Gemini API with the search query through the controller with filters
+      // First set the filters in the controller
+      debugPrint('===== SETTING CONTROLLER FILTERS =====');
+      // Create a temporary category to set in the controller
+      final tempCategory = GameCategory(
+        id: searchQuery.toLowerCase().replaceAll(' ', '-'),
+        name: searchQuery,
+        description: searchQuery,
+        color: Colors.blue,
+        iconPath: 'assets/icons/game.svg',
+      );
+
+      // Set the filters in the controller
+      _geminiController.selectedCategory.value = tempCategory;
+      _geminiController.selectedPlayerCount.value = _minPlayers.value;
+      _geminiController.selectedMaxTime.value = _maxTime.value;
+
+      // Now make the call with the controller
+      debugPrint('===== MAKING CONTROLLER API CALL WITH FILTERS =====');
+      await _geminiController.getGamesWithFilters();
       debugPrint('Controller API call completed');
 
       // Print API details to console
       debugPrint('===== SEARCH QUERY =====');
       debugPrint('Query: $searchQuery');
+      debugPrint('Filters: Min Players: ${_minPlayers.value}, Max Time: ${_maxTime.value}');
       debugPrint('===== END SEARCH QUERY =====');
 
       // Display a snackbar to show that API details are available
@@ -188,26 +211,16 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       // For diagnostic purposes
       debugPrint('Controller has ${_geminiController.games.length} games after API call');
 
-      // Filter results based on player count and time if needed
+      // Now we don't need to filter the results locally as they were already filtered by the API
+      // Just use the results directly
       _filteredGames.value =
-          _geminiController.games.isEmpty
-              ? directApiGames
-              : _geminiController.games.where((game) {
-                // Player filter
-                final hasEnoughPlayers =
-                    game.minPlayers <= _minPlayers.value && game.maxPlayers >= _minPlayers.value;
-
-                // Time filter
-                final withinTimeLimit = game.estimatedTimeMinutes <= _maxTime.value;
-
-                return hasEnoughPlayers && withinTimeLimit;
-              }).toList();
+          _geminiController.games.isEmpty ? directApiGames : _geminiController.games;
 
       // Display results count for diagnosis
       debugPrint('Filtered games count: ${_filteredGames.length}');
 
       if (_filteredGames.isEmpty && directApiGames.isNotEmpty) {
-        // If direct API call has games but they're filtered out or controller failed
+        // If direct API call has games but controller failed
         debugPrint('Using direct API results as fallback');
         _filteredGames.value = directApiGames;
 
@@ -218,18 +231,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           backgroundColor: Colors.orange,
           colorText: Colors.white,
         );
-      } else if (_filteredGames.isEmpty && _geminiController.games.isNotEmpty) {
-        // If we have games but they're filtered out, show a message
-        Get.snackbar(
-          'No Matches',
-          'Games found, but none match your filters. Try adjusting your filters.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
       } else if (_filteredGames.isEmpty) {
         // If no games at all, show a different message
         Get.snackbar(
           'No Results',
-          'No games found for "${_searchController.text}". Try a different search term.',
+          'No games found for "${_searchController.text}" with your filter settings. Try different search terms or adjust your filters.',
           snackPosition: SnackPosition.BOTTOM,
         );
       } else {
@@ -1288,7 +1294,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   ),
                   TextButton.icon(
                     onPressed: () {
-                      players.value = 1;
+                      players.value = 15;
                       maxTime.value = 60;
                     },
                     icon: Icon(Icons.refresh, color: colorScheme.primary),
@@ -1339,9 +1345,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         trackHeight: 4,
                       ),
                       child: Slider(
-                        min: 1,
+                        min: 15,
                         max: 30,
-                        divisions: 29,
+                        divisions: 15,
                         value: players.value.toDouble(),
                         onChanged: (value) => players.value = value.round(),
                       ),
@@ -1354,13 +1360,19 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '1',
+                            '15',
                             style: TextStyle(
                               color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                             ),
                           ),
                           Text(
-                            '15',
+                            '20',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                          ),
+                          Text(
+                            '25',
                             style: TextStyle(
                               color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                             ),
@@ -1480,6 +1492,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       _minPlayers.value = players.value;
                       _maxTime.value = maxTime.value;
                       Get.back();
+
+                      // If in Gemini mode and we have a search query, re-execute the search with new filters
+                      if (_isGeminiMode.value && _searchController.text.isNotEmpty) {
+                        _searchGamesWithGemini();
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colorScheme.primary,
@@ -1514,7 +1531,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   // Method to reset all filters
   void _resetFilters() {
-    _minPlayers.value = 1;
+    _minPlayers.value = 15;
     _maxTime.value = 60;
     _searchController.clear();
   }
