@@ -13,8 +13,24 @@ class CategoryController extends GetxController {
   final GeminiAppController _geminiController = Get.find<GeminiAppController>();
   final RxBool isLoading = false.obs;
   final RxList<Game> games = <Game>[].obs;
+  final RxBool isGeminiMode = false.obs;
   // For text search
   final searchController = TextEditingController();
+  final RxList<String> searchSuggestions = <String>[].obs;
+
+  // Pagination variables
+  final RxList<Game> searchResults = <Game>[].obs;
+  final RxBool isLoadingMore = false.obs;
+  final RxBool hasMoreResults = true.obs;
+  final int pageSize = 10;
+  final RxInt currentPage = 1.obs;
+  final RxString lastSearchQuery = "".obs;
+
+  // Added for random category games
+  final RxList<Game> categoryGames = <Game>[].obs;
+  final RxBool isLoadingCategoryGames = false.obs;
+  final RxBool hasMoreCategoryGames = true.obs;
+  final RxInt categoryCurrentPage = 1.obs;
 
   @override
   void onInit() {
@@ -28,6 +44,47 @@ class CategoryController extends GetxController {
   void onClose() {
     searchController.dispose();
     super.onClose();
+  }
+
+  // Load random games based on category title
+  Future<void> loadGamesByTitle(String title, {bool resetPagination = true}) async {
+    if (resetPagination) {
+      isLoadingCategoryGames.value = true;
+      categoryCurrentPage.value = 1;
+      categoryGames.clear();
+    } else {
+      isLoadingMore.value = true;
+    }
+
+    try {
+      final results = await _geminiController.getGamesByCategory(
+        title,
+        pageSize: pageSize,
+        page: categoryCurrentPage.value,
+      );
+
+      if (results.isEmpty) {
+        hasMoreCategoryGames.value = false;
+      } else {
+        categoryGames.addAll(results);
+        categoryCurrentPage.value++;
+        hasMoreCategoryGames.value = results.length >= pageSize;
+      }
+
+      refreshUI();
+    } catch (e) {
+      debugPrint('Error loading category games: $e');
+    } finally {
+      isLoadingCategoryGames.value = false;
+      isLoadingMore.value = false;
+    }
+  }
+
+  // Load more category games when user reaches end of list
+  Future<void> loadMoreCategoryGames(String title) async {
+    if (!isLoadingMore.value && hasMoreCategoryGames.value) {
+      await loadGamesByTitle(title, resetPagination: false);
+    }
   }
 
   // Load all games
@@ -61,5 +118,79 @@ class CategoryController extends GetxController {
   // Force UI to refresh after hot restart
   void refreshUI() {
     update(['filteredGames', 'suggestions']);
+  }
+
+  // Fetch search suggestions from Gemini API
+  Future<void> fetchSuggestions(String query, {String screenTitle = 'Games'}) async {
+    if (query.isEmpty) {
+      searchSuggestions.clear();
+      return;
+    }
+
+    try {
+      // Create a more contextualized query with the screen title
+      String contextualQuery = screenTitle != 'Games' ? '$screenTitle related to $query' : query;
+
+      // Get suggestions from Gemini API with context
+      final suggestions = await _geminiController.getSuggestions(contextualQuery);
+
+      // Update suggestions list
+      searchSuggestions.value = suggestions;
+
+      debugPrint(
+        'Fetched ${suggestions.length} suggestions for "$query" in category "$screenTitle"',
+      );
+    } catch (e) {
+      debugPrint('Error fetching suggestions: $e');
+      // Clear suggestions on error
+      searchSuggestions.clear();
+    }
+  }
+
+  // Search games with text and pagination
+  Future<void> searchGames(String query, {bool resetPagination = true}) async {
+    if (query.isEmpty) {
+      searchResults.clear();
+      return;
+    }
+
+    if (resetPagination) {
+      isLoading.value = true;
+      currentPage.value = 1;
+      searchResults.clear();
+      lastSearchQuery.value = query;
+    } else {
+      isLoadingMore.value = true;
+    }
+
+    try {
+      final results = await _geminiController.getGamesByCategory(
+        query,
+        pageSize: pageSize,
+        page: currentPage.value,
+      );
+
+      if (results.isEmpty) {
+        hasMoreResults.value = false;
+      } else {
+        searchResults.addAll(results);
+        currentPage.value++;
+        hasMoreResults.value = results.length >= pageSize;
+      }
+
+      refreshUI();
+    } catch (e) {
+      debugPrint('Error searching games: $e');
+    } finally {
+      isLoading.value = false;
+      isLoadingMore.value = false;
+    }
+  }
+
+  // Load more search results when user reaches end of list
+  Future<void> loadMoreResults() async {
+    if (!isLoadingMore.value && hasMoreResults.value) {
+      await searchGames(lastSearchQuery.value, resetPagination: false);
+    }
   }
 }

@@ -26,19 +26,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   final RxInt _maxTime = 60.obs;
   final RxList<String> _searchSuggestions = <String>[].obs;
   final RxBool _showSuggestions = false.obs;
-
-  // Sample suggestions
-  final List<String> _dummySuggestions = [
-    'Team building',
-    'Ice breakers',
-    'Quick games',
-    'Indoor games',
-    'Outdoor activities',
-    'No materials needed',
-    'Party games',
-    'Strategy games',
-    'Brain teasers',
-  ];
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -51,6 +39,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         _screenTitle.value = Get.arguments['title'];
         // Force update controller to ensure UI reflects changes
         _categoryController.refreshUI();
+
+        // Load random games based on the category title
+        _categoryController.loadGamesByTitle(_screenTitle.value);
       }
 
       // Update navigation controller index
@@ -60,8 +51,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       _updateFilteredGames();
     });
 
-    // Add listener for search suggestions
-    _searchController.addListener(_updateSearchSuggestions);
+    // Setup scroll controller for pagination
+    _scrollController.addListener(_scrollListener);
 
     // Setup listener for screen title changes to update UI
     ever(_screenTitle, (_) => _categoryController.refreshUI());
@@ -69,45 +60,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   @override
   void dispose() {
-    _searchController.removeListener(_updateSearchSuggestions);
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _updateSearchSuggestions() {
-    if (_searchController.text.isEmpty) {
-      _searchSuggestions.clear();
-      _showSuggestions.value = false;
-      return;
-    }
-
-    final query = _searchController.text.toLowerCase();
-    List<String> suggestions = ['All games'];
-
-    // Add suggestions that match the query
-    suggestions.addAll(
-      _dummySuggestions.where((suggestion) => suggestion.toLowerCase().contains(query)),
-    );
-
-    // Get game names that match the query
-    final allGames = _categoryController.getGamesForDisplay();
-    final matchedGames =
-        allGames.where((game) {
-          return game.name.toLowerCase().contains(query) ||
-              game.description.toLowerCase().contains(query);
-        }).toList();
-
-    // Add game names to suggestions
-    suggestions.addAll(matchedGames.map((game) => game.name).toSet());
-
-    // Remove duplicates and limit
-    suggestions = suggestions.toSet().toList();
-    if (suggestions.length > 6) {
-      suggestions = suggestions.sublist(0, 6);
-    }
-
-    _searchSuggestions.value = suggestions;
-    _showSuggestions.value = true;
   }
 
   void _updateFilteredGames() {
@@ -236,21 +192,21 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
             // Search Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
                   // Search Bar
                   Expanded(
                     child: Container(
-                      height: 50,
+                      height: 56,
                       decoration: BoxDecoration(
                         color: isDarkMode ? const Color(0xFF252842) : Colors.white,
-                        borderRadius: BorderRadius.circular(25),
+                        borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(isDarkMode ? 0.2 : 0.08),
-                            blurRadius: isDarkMode ? 8 : 10,
-                            offset: const Offset(0, 3),
+                            color: Colors.black.withOpacity(isDarkMode ? 0.2 : 0.05),
+                            blurRadius: isDarkMode ? 8 : 6,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
@@ -258,17 +214,17 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         children: [
                           // Left search icon in blue circle
                           Container(
-                            width: 50,
-                            height: 50,
-                            padding: const EdgeInsets.all(12),
+                            width: 56,
+                            height: 56,
+                            padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color:
                                   isDarkMode
                                       ? const Color(0xFF2D3250)
                                       : primaryColor.withOpacity(0.03),
-                              borderRadius: BorderRadius.circular(25),
+                              borderRadius: BorderRadius.circular(28),
                             ),
-                            child: Icon(Icons.search, color: primaryColor, size: 22),
+                            child: Icon(Icons.search, color: primaryColor, size: 24),
                           ),
                           // Text Field
                           Expanded(
@@ -278,18 +234,44 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                               ),
                               child: TextField(
                                 controller: _searchController,
-                                style: TextStyle(fontSize: 15, color: textColor, height: 1.1),
+                                style: TextStyle(fontSize: 16, color: textColor, height: 1.1),
                                 decoration: InputDecoration(
                                   hintText: 'Search games...',
                                   hintStyle: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 16,
                                     color: subtitleColor,
                                     height: 1.1,
                                   ),
                                   border: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                                 ),
-                                onSubmitted: (_) => _updateFilteredGames(),
+                                onChanged: (value) {
+                                  // Fetch suggestions using the Gemini API through controller
+                                  // Pass the current screen title for contextual suggestions
+                                  _categoryController.fetchSuggestions(
+                                    value,
+                                    screenTitle: _screenTitle.value,
+                                  );
+
+                                  // Update the UI to show suggestions if we have any
+                                  _showSuggestions.value = value.isNotEmpty;
+
+                                  // Only update filtered games for immediate feedback
+                                  // We'll do the full search on submit for better performance
+                                  if (value.isEmpty) {
+                                    _updateFilteredGames();
+                                  }
+                                },
+                                onSubmitted: (value) {
+                                  // Hide suggestions and update filtered games
+                                  _showSuggestions.value = false;
+                                  if (value.isNotEmpty) {
+                                    // Search using Gemini with pagination
+                                    _categoryController.searchGames(value);
+                                  } else {
+                                    _updateFilteredGames();
+                                  }
+                                },
                               ),
                             ),
                           ),
@@ -303,6 +285,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                     onPressed: () {
                                       _searchController.clear();
                                       _updateFilteredGames();
+                                      _showSuggestions.value = false;
+                                      _categoryController.searchResults.clear();
+                                      _categoryController.lastSearchQuery.value = "";
                                     },
                                   )
                                   : const SizedBox.shrink();
@@ -315,21 +300,21 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   const SizedBox(width: 12),
                   // Filter Button
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       color: isDarkMode ? const Color(0xFF252842) : Colors.white,
-                      borderRadius: BorderRadius.circular(25),
+                      borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(isDarkMode ? 0.2 : 0.08),
-                          blurRadius: isDarkMode ? 8 : 10,
-                          offset: const Offset(0, 3),
+                          color: Colors.black.withOpacity(isDarkMode ? 0.2 : 0.05),
+                          blurRadius: isDarkMode ? 8 : 6,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                     child: IconButton(
-                      icon: Icon(Icons.tune, color: textColor, size: 22),
+                      icon: Icon(Icons.tune_rounded, color: textColor, size: 24),
                       padding: EdgeInsets.zero,
                       onPressed: () => _showFiltersDialog(context),
                     ),
@@ -340,7 +325,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
             // Suggestions Section - Using Obx for reactive updates
             Obx(() {
-              if (_showSuggestions.value && _searchSuggestions.isNotEmpty) {
+              if (_showSuggestions.value && _categoryController.searchSuggestions.isNotEmpty) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -364,11 +349,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       child: ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         scrollDirection: Axis.horizontal,
-                        itemCount: _searchSuggestions.length,
+                        itemCount: _categoryController.searchSuggestions.length,
                         separatorBuilder: (context, index) => const SizedBox(width: 10),
                         itemBuilder: (context, index) {
                           return _buildSuggestionChip(
-                            _searchSuggestions[index],
+                            _categoryController.searchSuggestions[index],
                             isDarkMode,
                             Theme.of(context).colorScheme,
                           );
@@ -384,24 +369,67 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             // Content Area (Games Grid or Empty State)
             Expanded(
               child: Obx(() {
-                // Convert from Rx to standard list to avoid nested reactive operations
-                final games = _filteredGames.toList();
+                // Check if we're in search mode
+                final useSearchResults =
+                    _searchController.text.isNotEmpty &&
+                    _categoryController.lastSearchQuery.value.isNotEmpty;
+
+                // Get appropriate list of games based on mode
+                final games =
+                    useSearchResults
+                        ? _categoryController.searchResults.toList()
+                        : _categoryController.categoryGames.isNotEmpty
+                        ? _categoryController.categoryGames.toList()
+                        : _filteredGames.toList();
+
+                // Show loading state if appropriate
+                if (_categoryController.isLoading.value ||
+                    _categoryController.isLoadingCategoryGames.value) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildProfessionalLoadingIndicator(isDarkMode, primaryColor),
+                        const SizedBox(height: 16),
+                        Text(
+                          "Loading games...",
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
                 if (games.isEmpty) {
                   return _buildNoGamesFoundState(isDarkMode);
                 } else {
-                  return GridView.builder(
-                    padding: EdgeInsets.all(16),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemCount: games.length,
-                    itemBuilder: (context, index) {
-                      return _buildGameCard(games[index], context, isDarkMode);
-                    },
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          itemCount:
+                              games.length + (_categoryController.isLoadingMore.value ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            // If we've reached the end and we're loading more, show loading indicator
+                            if (index == games.length && _categoryController.isLoadingMore.value) {
+                              return _buildProfessionalLoadingIndicator(isDarkMode, primaryColor);
+                            }
+
+                            // Otherwise show the game card
+                            return _buildEnhancedGameCard(games[index], context, isDarkMode);
+                          },
+                        ),
+                      ),
+
+                      // No more results message
+                      _buildNoMoreResultsMessage(games, useSearchResults, subtitleColor),
+                    ],
                   );
                 }
               }),
@@ -883,18 +911,21 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Widget _buildSuggestionChip(String suggestion, bool isDarkMode, ColorScheme colorScheme) {
     final textColor = isDarkMode ? AppTheme.textColorDarkMode : AppTheme.textColor;
     final primaryColor = isDarkMode ? AppTheme.primaryColorDarkMode : AppTheme.primaryColor;
+    final backgroundColor = isDarkMode ? const Color(0xFF252842) : Colors.white;
 
     return InkWell(
       onTap: () {
         _searchController.text = suggestion;
         _showSuggestions.value = false;
-        _updateFilteredGames();
+
+        // Use Gemini search with pagination
+        _categoryController.searchGames(suggestion);
       },
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
         decoration: BoxDecoration(
-          color: isDarkMode ? const Color(0xFF252842) : Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
@@ -984,5 +1015,331 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       color: Colors.grey.shade200,
       child: Center(child: Icon(Icons.image_outlined, size: 40, color: Colors.grey)),
     );
+  }
+
+  // Scroll listener for pagination
+  void _scrollListener() {
+    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+      final useSearchResults =
+          _searchController.text.isNotEmpty && _categoryController.lastSearchQuery.value.isNotEmpty;
+
+      if (useSearchResults) {
+        // When user reaches the bottom of the search results list, load more results
+        _categoryController.loadMoreResults();
+      } else {
+        // When user reaches the bottom of the category list, load more category games
+        _categoryController.loadMoreCategoryGames(_screenTitle.value);
+      }
+    }
+  }
+
+  Widget _buildProfessionalLoadingIndicator(bool isDarkMode, Color primaryColor) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                strokeWidth: 3,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Loading games...",
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.white70 : Colors.black54,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedGameCard(Game game, BuildContext context, bool isDarkMode) {
+    final textColor = isDarkMode ? AppTheme.textColorDarkMode : AppTheme.textColor;
+    final subtitleColor = isDarkMode ? AppTheme.lightTextColorDarkMode : AppTheme.lightTextColor;
+    final primaryColor = isDarkMode ? AppTheme.primaryColorDarkMode : AppTheme.primaryColor;
+    final backgroundColor = isDarkMode ? const Color(0xFF252842) : Colors.white;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDarkMode ? 0.25 : 0.04),
+            blurRadius: isDarkMode ? 12 : 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => Get.toNamed(AppRoutes.GAME_DETAILS, arguments: game),
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top section with image and title/rating
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left side with image
+                    Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _buildGameImage(game.imageUrl),
+                    ),
+
+                    const SizedBox(width: 16),
+
+                    // Title and rating section
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Title
+                          Text(
+                            game.name,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // Rating and difficulty row
+                          Row(
+                            children: [
+                              Icon(Icons.star, color: Colors.amber, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                game.rating.toStringAsFixed(1),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _getDifficultyColor(
+                                    game.difficultyLevel,
+                                    isDarkMode,
+                                  ).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(50),
+                                ),
+                                child: Text(
+                                  game.difficultyLevel,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: _getDifficultyColor(game.difficultyLevel, isDarkMode),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Description text
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(
+                  game.description,
+                  style: TextStyle(fontSize: 14, color: subtitleColor, height: 1.3),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+              // Bottom section with game type, time and players
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Row(
+                  children: [
+                    // Game type tag
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            game.teamBased ? Icons.group : _getGameTypeIcon(game.gameType),
+                            color: primaryColor,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            game.teamBased ? 'Cooperative' : game.gameType,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    // Time pill
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time_rounded, color: subtitleColor, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${game.estimatedTimeMinutes} min',
+                          style: TextStyle(
+                            color: subtitleColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    // Players pill
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.people_outline, color: subtitleColor, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${game.minPlayers}-${game.maxPlayers}',
+                          style: TextStyle(
+                            color: subtitleColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // View Game button at the bottom
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'View Game',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Icon(Icons.chevron_right, color: Colors.white, size: 18),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper method to get difficulty color
+  Color _getDifficultyColor(String difficulty, bool isDarkMode) {
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        return Colors.green;
+      case 'medium':
+        return Colors.orange;
+      case 'hard':
+        return Colors.red;
+      default:
+        return isDarkMode ? AppTheme.primaryColorDarkMode : AppTheme.primaryColor;
+    }
+  }
+
+  // Helper method to get game type icon
+  IconData _getGameTypeIcon(String gameType) {
+    switch (gameType.toLowerCase()) {
+      case 'indoor':
+        return Icons.home;
+      case 'outdoor':
+        return Icons.terrain;
+      case 'desk-based':
+        return Icons.desktop_windows;
+      default:
+        return Icons.sports_esports;
+    }
+  }
+
+  Widget _buildNoMoreResultsMessage(List<Game> games, bool useSearchResults, Color subtitleColor) {
+    if (games.isNotEmpty && !_categoryController.isLoadingMore.value) {
+      final noMoreResults =
+          useSearchResults
+              ? !_categoryController.hasMoreResults.value
+              : !_categoryController.hasMoreCategoryGames.value;
+
+      if (noMoreResults) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Text(
+              "No more results",
+              style: TextStyle(color: subtitleColor, fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ),
+        );
+      }
+    }
+    return const SizedBox.shrink();
   }
 }

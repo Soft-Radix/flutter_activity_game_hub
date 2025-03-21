@@ -71,21 +71,33 @@ class GeminiGameProvider extends GetxService {
   }
 
   // Get games by category
-  Future<List<Game>> getGamesByCategory(String category) async {
-    // Check cache first
-    if (_cachedGames.containsKey('category_$category')) {
-      return _cachedGames['category_$category']!;
+  Future<List<Game>> getGamesByCategory(String category, {int? pageSize, int? page}) async {
+    // Create a cache key that includes pagination info
+    String cacheKey = 'category_$category';
+    if (pageSize != null && page != null) {
+      cacheKey += '_page${page}_size$pageSize';
     }
 
-    // Get from API
-    final games = await _geminiApiService.getGames(category: category);
+    // Check cache first
+    if (_cachedGames.containsKey(cacheKey)) {
+      return _cachedGames[cacheKey]!;
+    }
+
+    // Get games from API with pagination parameters
+    final games = await _geminiApiService.getGames(
+      category: category,
+      gameCount: pageSize ?? 20, // Default to 20 if not specified
+      page: page ?? 1, // Default to first page if not specified
+    );
 
     // Save to cache
-    _cachedGames['category_$category'] = games;
+    _cachedGames[cacheKey] = games;
 
-    // Save to local storage
-    for (final game in games) {
-      await _gamesBox.put(game.id, game);
+    // Save to local storage (only cache first page results to avoid duplication)
+    if (page == null || page == 1) {
+      for (final game in games) {
+        await _gamesBox.put(game.id, game);
+      }
     }
 
     return games;
@@ -172,6 +184,17 @@ class GeminiGameProvider extends GetxService {
     }
 
     return games;
+  }
+
+  // Get search suggestions based on query
+  Future<List<String>> getSearchSuggestions(String query) async {
+    try {
+      // Get suggestions from Gemini API
+      return await _geminiApiService.getSuggestions(query);
+    } catch (e) {
+      print('Error getting search suggestions: $e');
+      return [];
+    }
   }
 
   // Get featured games

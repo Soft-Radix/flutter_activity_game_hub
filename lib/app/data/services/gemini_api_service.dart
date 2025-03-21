@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -177,6 +176,7 @@ class GeminiApiService {
     int? maxPlayers,
     int? maxTimeMinutes,
     int gameCount = 5,
+    int page = 1,
   }) {
     // Add randomness to ensure different responses each time
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -193,6 +193,15 @@ class GeminiApiService {
     
     Generate creative and interesting games that are not commonly known or popular.
     Ensure high variety in the types of games, player counts, and durations.
+    ''';
+
+    // Add pagination information
+    if (page > 1) {
+      basePrompt +=
+          '\n\nThis is page $page of results. Generate different games than those on previous pages.';
+    }
+
+    basePrompt += '''
     
     Return the response as a valid JSON array only, without any additional text, explanation, or markdown formatting.
     Do not include any text before or after the JSON array.
@@ -242,43 +251,9 @@ class GeminiApiService {
   // Get a single random game
   Future<Game?> getRandomGame() async {
     try {
-      // Use different categories, player counts, or time limits each time to increase variability
-      final randomOptions = [
-        {'category': 'Team-Building'},
-        {'category': 'Party Games'},
-        {'category': 'Brain Games'},
-        {'category': 'Icebreakers'},
-        {'category': 'Outdoor Games'},
-        {'minPlayers': 2, 'maxPlayers': 6},
-        {'minPlayers': 4, 'maxPlayers': 10},
-        {'minPlayers': 3, 'maxPlayers': 20},
-        {'maxTimeMinutes': 15},
-        {'maxTimeMinutes': 30},
-        {'maxTimeMinutes': 45},
-        {}, // Empty for no specific filters
-      ];
-
-      // Pick a random set of options
-      final random = Random();
-      final options = randomOptions[random.nextInt(randomOptions.length)];
-
-      // Add temperature variation to increase randomness
-      final temperature = 0.6 + (random.nextDouble() * 0.4); // Between 0.6 and 1.0
-
-      // Request just one game from Gemini with random options
-      final games = await getGames(
-        category: options['category'] as String?,
-        minPlayers: options['minPlayers'] as int?,
-        maxPlayers: options['maxPlayers'] as int?,
-        maxTimeMinutes: options['maxTimeMinutes'] as int?,
-        gameCount: 1,
-        temperature: temperature,
-      );
-
-      if (games.isNotEmpty) {
-        return games.first;
-      }
-      return null;
+      // Fetching a single random game from Gemini
+      final List<Game> games = await getGames(gameCount: 1, isRandom: true);
+      return games.isNotEmpty ? games.first : null;
     } catch (e) {
       debugPrint('Error getting random game: $e');
       return null;
@@ -293,6 +268,8 @@ class GeminiApiService {
     int? maxTimeMinutes,
     int gameCount = 5,
     double temperature = 0.2,
+    bool isRandom = false,
+    int page = 1,
   }) async {
     try {
       // Get API key from secure storage
@@ -319,6 +296,7 @@ class GeminiApiService {
         maxPlayers: maxPlayers,
         maxTimeMinutes: maxTimeMinutes,
         gameCount: gameCount,
+        page: page,
       );
 
       // Store the prompt for later reference
@@ -542,6 +520,116 @@ class GeminiApiService {
     } catch (e) {
       debugPrint('Exception in getGameDetails: $e');
       return null;
+    }
+  }
+
+  // Get search suggestions based on a query string
+  Future<List<String>> getSuggestions(String query) async {
+    try {
+      // Get API key from secure storage
+      final apiKey = await ApiConfig.getGeminiApiKey();
+
+      if (apiKey.startsWith("PLEASE_ADD_YOUR_GEMINI_API_KEY")) {
+        debugPrint('No API key set. Please add your Gemini API key in Settings.');
+        return [];
+      }
+
+      // Check if the query contains category context (e.g., "Ice Breakers related to...")
+      bool hasCategoryContext = query.contains("related to");
+      String category = "";
+      String searchTerm = query;
+
+      if (hasCategoryContext) {
+        // Extract category and search term
+        final parts = query.split("related to");
+        if (parts.length >= 2) {
+          category = parts[0].trim();
+          searchTerm = parts[1].trim();
+        }
+      }
+
+      // Create a prompt for search suggestions
+      String prompt = '''
+You are a search suggestion engine for an activity games app. ${hasCategoryContext ? 'The user is currently viewing the "$category" category.' : ''}
+Given the partial search query "$searchTerm" provided by the user, suggest relevant search terms or activities${hasCategoryContext ? ' related to $category' : ''}.
+Return ONLY an array of strings with relevant search suggestions. Limit to a maximum of 6 suggestions.
+
+User query: "$searchTerm"
+
+Return format: 
+["suggestion1", "suggestion2", ...]
+
+Remember to ONLY return the JSON array, nothing else.
+''';
+
+      // Store the prompt for later reference
+      lastPrompt = prompt;
+
+      // Prepare request body with lower temperature for more focused results
+      Map<String, dynamic> requestBody = {
+        "contents": [
+          {
+            "parts": [
+              {"text": prompt},
+            ],
+          },
+        ],
+        "generationConfig": {
+          "temperature": 0.2,
+          "topK": 40,
+          "topP": 0.95,
+          "maxOutputTokens": 2048,
+          "responseMimeType": "application/json",
+        },
+      };
+
+      // Make API request
+      final response = await _dio.post(
+        "$apiUrl?key=$apiKey",
+        data: requestBody,
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          validateStatus: (status) => status! < 500,
+        ),
+      );
+
+      // Store the raw response for debugging
+      lastRawResponse = json.encode(response.data);
+
+      // Handle API response
+      if (response.statusCode == 200) {
+        String generatedText = "";
+
+        try {
+          // Extract the text from the response
+          generatedText = response.data["candidates"][0]["content"]["parts"][0]["text"];
+
+          // Clean up the text to ensure it's proper JSON
+          generatedText = generatedText.trim();
+
+          // If response is not wrapped in array brackets, do it
+          if (!generatedText.startsWith("[")) {
+            generatedText = "[$generatedText]";
+          }
+
+          // Parse the JSON
+          final List<dynamic> parsedJson = json.decode(generatedText);
+          lastParsedJson = json.encode(parsedJson); // Store for debugging
+
+          // Convert each item to string and return
+          return parsedJson.map((item) => item.toString()).toList();
+        } catch (e) {
+          debugPrint('Error parsing suggestions response: $e');
+          debugPrint('Response was: $generatedText');
+          return [];
+        }
+      } else {
+        debugPrint('Error getting suggestions: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      debugPrint('Exception getting suggestions: $e');
+      return [];
     }
   }
 }

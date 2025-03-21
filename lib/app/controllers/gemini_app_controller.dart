@@ -46,54 +46,60 @@ class GeminiAppController extends GetxController {
   }
 
   // Load categories
-  void loadCategories() {
-    // These are hardcoded categories for now
-    // You could fetch them from the API in the future
-    categories.value = [
-      GameCategory(
-        id: '1',
-        name: 'Icebreakers',
-        description: 'Games to help people get to know each other',
-        iconPath: 'assets/icons/ice.svg',
-        color: Colors.blue,
-      ),
-      GameCategory(
-        id: '2',
-        name: 'Team-Building',
-        description: 'Games that help build team cohesion',
-        iconPath: 'assets/icons/team.svg',
-        color: Colors.green,
-      ),
-      GameCategory(
-        id: '3',
-        name: 'Brain Games',
-        description: 'Games that challenge the mind',
-        iconPath: 'assets/icons/brain.svg',
-        color: Colors.purple,
-      ),
-      GameCategory(
-        id: '4',
-        name: 'Quick Games',
-        description: 'Games that can be played quickly',
-        iconPath: 'assets/icons/clock.svg',
-        color: Colors.orange,
-      ),
-    ];
+  Future<void> loadCategories() async {
+    try {
+      // Simple categories based on games (can be enhanced later)
+      // This will be replaced with a proper API call in the future
+      final Set<String> categoryNames = <String>{};
+      for (var game in games) {
+        if (game.category.isNotEmpty) {
+          categoryNames.add(game.category);
+        }
+      }
+
+      // Convert to GameCategory objects
+      final categoryList =
+          categoryNames.map((name) {
+            return GameCategory(
+              id: name.toLowerCase().replaceAll(' ', '-'),
+              name: name,
+              description: '$name games',
+              color: _getCategoryColor(name),
+              iconPath: _getCategoryIconPath(name),
+            );
+          }).toList();
+
+      categories.value = categoryList;
+    } catch (e) {
+      print('Error loading categories: $e');
+    }
   }
 
-  // Get games by category
-  Future<void> getGamesByCategory(String category) async {
+  // Get games by category using Gemini API
+  Future<List<Game>> getGamesByCategory(String category, {int? pageSize, int? page}) async {
     isLoading.value = true;
     try {
-      games.value = await _gameProvider.getGamesByCategory(category);
+      final fetchedGames = await _gameProvider.getGamesByCategory(
+        category,
+        pageSize: pageSize,
+        page: page,
+      );
+
+      // Only update the main games list if this is the first page or not paginated
+      if (page == null || page == 1) {
+        games.value = fetchedGames;
+      }
+
+      return fetchedGames;
     } catch (e) {
       Get.snackbar(
         'Error',
-        'Failed to load games: ${e.toString()}',
+        'Failed to load games by category: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
+      return [];
     } finally {
       isLoading.value = false;
     }
@@ -186,5 +192,61 @@ class GeminiAppController extends GetxController {
   void clearCache() {
     _gameProvider.clearCache();
     loadGames();
+  }
+
+  // Get search suggestions using Gemini API
+  Future<List<String>> getSuggestions(String query) async {
+    if (query.isEmpty) {
+      return [];
+    }
+
+    try {
+      // Use _gameProvider to get suggestions
+      return await _gameProvider.getSearchSuggestions(query);
+    } catch (e) {
+      print('Error getting suggestions: $e');
+      return [];
+    }
+  }
+
+  // Helper to generate colors for categories
+  Color _getCategoryColor(String categoryName) {
+    // Simple mapping based on category name
+    final lowerCaseName = categoryName.toLowerCase();
+
+    if (lowerCaseName.contains('ice') || lowerCaseName.contains('break')) {
+      return Colors.blue;
+    } else if (lowerCaseName.contains('team') || lowerCaseName.contains('building')) {
+      return Colors.green;
+    } else if (lowerCaseName.contains('brain') || lowerCaseName.contains('puzzle')) {
+      return Colors.purple;
+    } else if (lowerCaseName.contains('quick') || lowerCaseName.contains('fast')) {
+      return Colors.orange;
+    } else if (lowerCaseName.contains('outdoor')) {
+      return Colors.lightGreen;
+    } else if (lowerCaseName.contains('party')) {
+      return Colors.pink;
+    } else {
+      // Default color
+      return Colors.teal;
+    }
+  }
+
+  // Get category icon path based on name
+  String _getCategoryIconPath(String categoryName) {
+    // Default icon paths based on category
+    final lowerCaseName = categoryName.toLowerCase();
+
+    if (lowerCaseName.contains('ice') || lowerCaseName.contains('break')) {
+      return 'assets/icons/ice.svg';
+    } else if (lowerCaseName.contains('team') || lowerCaseName.contains('building')) {
+      return 'assets/icons/team.svg';
+    } else if (lowerCaseName.contains('brain') || lowerCaseName.contains('puzzle')) {
+      return 'assets/icons/brain.svg';
+    } else if (lowerCaseName.contains('quick') || lowerCaseName.contains('fast')) {
+      return 'assets/icons/clock.svg';
+    } else {
+      return 'assets/icons/game.svg';
+    }
   }
 }
