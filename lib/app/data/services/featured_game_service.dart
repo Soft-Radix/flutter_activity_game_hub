@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/game_model.dart';
 import 'api_config.dart';
+import 'gemini_api_service.dart';
 
 class FeaturedGameService {
   final Dio _dio = Dio();
@@ -294,6 +295,7 @@ class FeaturedGameService {
 
           // Parse the JSON string to get the game
           final gameJson = json.decode(textValue);
+          Game? game;
 
           // If we received an array but we only want one game, take the first
           if (gameJson is List && gameJson.isNotEmpty) {
@@ -303,19 +305,8 @@ class FeaturedGameService {
             // Make sure isFeatured is true
             singleGameJson['isFeatured'] = true;
 
-            // Process imageUrl
-            if (singleGameJson['imageUrl'] != null &&
-                singleGameJson['imageUrl'].toString().isNotEmpty &&
-                !singleGameJson['imageUrl'].toString().startsWith('assets/') &&
-                !singleGameJson['imageUrl'].toString().startsWith('http')) {
-              singleGameJson['imageUrl'] = 'https://${singleGameJson['imageUrl']}';
-            } else if (singleGameJson['imageUrl'] == null ||
-                singleGameJson['imageUrl'].toString().isEmpty) {
-              singleGameJson['imageUrl'] = 'assets/images/placeholder.svg';
-            }
-
-            debugPrint('✅ Successfully created Game object from JSON array');
-            return Game.fromJson(singleGameJson);
+            // Create the game from JSON
+            game = Game.fromJson(singleGameJson);
           }
           // If we received a single object directly
           else if (gameJson is Map<String, dynamic>) {
@@ -323,23 +314,20 @@ class FeaturedGameService {
             // Make sure isFeatured is true
             gameJson['isFeatured'] = true;
 
-            // Process imageUrl
-            if (gameJson['imageUrl'] != null &&
-                gameJson['imageUrl'].toString().isNotEmpty &&
-                !gameJson['imageUrl'].toString().startsWith('assets/') &&
-                !gameJson['imageUrl'].toString().startsWith('http')) {
-              gameJson['imageUrl'] = 'https://${gameJson['imageUrl']}';
-            } else if (gameJson['imageUrl'] == null || gameJson['imageUrl'].toString().isEmpty) {
-              gameJson['imageUrl'] = 'assets/images/placeholder.svg';
-            }
-
-            debugPrint('✅ Successfully created Game object from JSON object');
-            return Game.fromJson(gameJson);
+            // Create the game from JSON
+            game = Game.fromJson(gameJson);
+          } else {
+            // If we got neither a list nor a map, return null
+            debugPrint('❌ Unexpected response format from Gemini');
+            return null;
           }
 
-          // If we got neither a list nor a map, return null
-          debugPrint('❌ Unexpected response format from Gemini');
-          return null;
+          // Get Unsplash image for the game using GeminiApiService
+          final geminiApiService = GeminiApiService();
+          final processedGame = await geminiApiService.processGameWithUnsplashImage(game);
+
+          debugPrint('✅ Successfully processed game with Unsplash image: ${processedGame?.name}');
+          return processedGame;
         } catch (e) {
           debugPrint('❌ Error parsing Gemini response: $e');
           return null;
@@ -365,7 +353,7 @@ class FeaturedGameService {
       "name": "Game name",
       "description": "A detailed description of the game",
       "category": "One of: Team-Building, Icebreakers, Brain Games, Quick Games",
-      "imageUrl": "leave empty or provide a placeholder image path",
+      "imageUrl": "a descriptive search query for Unsplash images related to the game",
       "minPlayers": minimum players required (number),
       "maxPlayers": maximum players allowed (number),
       "estimatedTimeMinutes": estimated time to play in minutes (number),
@@ -380,6 +368,9 @@ class FeaturedGameService {
       "rules": ["Rule 1", "Rule 2", ...],
       "howToPlay": "Brief explanation of gameplay"
     }
+    
+    IMPORTANT: For the imageUrl field, provide a descriptive search query (2-5 words) that can be used to find an appropriate image on Unsplash.
+    Examples: "team building outdoors", "office icebreaker game", "puzzle solving group". Don't include actual URLs.
     
     Focus on creating activities that are engaging, easy to explain, and help with team bonding.
     ''';

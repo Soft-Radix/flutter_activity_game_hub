@@ -278,6 +278,8 @@ class _RandomPickerScreenState extends State<RandomPickerScreen> with TickerProv
                                     ),
                                   ),
                                   const SizedBox(height: 8),
+
+                                  // Game title
                                   Text(
                                     _selectedGame!.name,
                                     style: textTheme.titleLarge?.copyWith(
@@ -288,86 +290,141 @@ class _RandomPickerScreenState extends State<RandomPickerScreen> with TickerProv
                                   ),
                                   const SizedBox(height: 16),
 
-                                  // Rating and Difficulty row
+                                  // Game image and details in row
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // Rating display
-                                      Icon(Icons.star, color: Colors.amber, size: 18),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${_selectedGame!.rating}',
-                                        style: textTheme.bodyMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: isDarkMode ? Colors.white : Colors.black87,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
+                                      // Game image on left
+                                      _buildGameImage(_selectedGame!.imageUrl, isDarkMode),
 
-                                      // Difficulty level
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _getDifficultyColor(
-                                            _selectedGame!.difficultyLevel,
-                                            isDarkMode,
-                                          ),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          _selectedGame!.difficultyLevel,
-                                          style: textTheme.bodySmall?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 12),
-
-                                  // Player count and time info
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.people,
-                                        size: 16,
-                                        color:
-                                            isDarkMode
-                                                ? AppTheme.lightTextColorDarkMode
-                                                : AppTheme.lightTextColor,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${_selectedGame!.minPlayers}-${_selectedGame!.maxPlayers} players',
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: context.textColor.withOpacity(0.7),
-                                        ),
-                                      ),
                                       const SizedBox(width: 16),
-                                      Icon(
-                                        Icons.timer,
-                                        size: 16,
-                                        color:
-                                            isDarkMode
-                                                ? AppTheme.lightTextColorDarkMode
-                                                : AppTheme.lightTextColor,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${_selectedGame!.estimatedTimeMinutes} min',
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: context.textColor.withOpacity(0.7),
+
+                                      // Game details on right
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Rating and difficulty row
+                                            Row(
+                                              children: [
+                                                // Rating display
+                                                Icon(Icons.star, color: Colors.amber, size: 18),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${_selectedGame!.rating}',
+                                                  style: textTheme.bodyMedium?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        isDarkMode ? Colors.white : Colors.black87,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+
+                                                // Difficulty level
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: _getDifficultyColor(
+                                                      _selectedGame!.difficultyLevel,
+                                                      isDarkMode,
+                                                    ),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    _selectedGame!.difficultyLevel,
+                                                    style: textTheme.bodySmall?.copyWith(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+                                            const SizedBox(height: 12),
+
+                                            // Game type (if available)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: (isDarkMode
+                                                        ? AppTheme.primaryColorDarkMode
+                                                        : AppTheme.primaryColor)
+                                                    .withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                _selectedGame!.gameType,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                  color:
+                                                      isDarkMode
+                                                          ? AppTheme.primaryColorDarkMode
+                                                          : AppTheme.primaryColor,
+                                                ),
+                                              ),
+                                            ),
+
+                                            const SizedBox(height: 12),
+
+                                            // Player count and time info
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.people,
+                                                  size: 16,
+                                                  color:
+                                                      isDarkMode
+                                                          ? AppTheme.lightTextColorDarkMode
+                                                          : AppTheme.lightTextColor,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${_selectedGame!.minPlayers}-${_selectedGame!.maxPlayers} players',
+                                                  style: textTheme.bodySmall?.copyWith(
+                                                    color: context.textColor.withOpacity(0.7),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+
+                                            const SizedBox(height: 4),
+
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.timer,
+                                                  size: 16,
+                                                  color:
+                                                      isDarkMode
+                                                          ? AppTheme.lightTextColorDarkMode
+                                                          : AppTheme.lightTextColor,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${_selectedGame!.estimatedTimeMinutes} min',
+                                                  style: textTheme.bodySmall?.copyWith(
+                                                    color: context.textColor.withOpacity(0.7),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
+
                                   const SizedBox(height: 24),
+
+                                  // Action buttons
                                   Row(
                                     children: [
                                       Expanded(
@@ -415,5 +472,84 @@ class _RandomPickerScreenState extends State<RandomPickerScreen> with TickerProv
             ),
           ),
     );
+  }
+
+  Widget _buildGameImage(String imageUrl, bool isDarkMode) {
+    final Widget placeholder = Container(
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.casino_rounded,
+          size: 50,
+          color:
+              isDarkMode
+                  ? AppTheme.primaryColorDarkMode.withOpacity(0.7)
+                  : AppTheme.primaryColor.withOpacity(0.7),
+        ),
+      ),
+    );
+
+    if (imageUrl.isEmpty) {
+      return placeholder;
+    }
+
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      // Remote image from URL with improved error handling
+      return Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+        clipBehavior: Clip.antiAlias,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          width: 120,
+          height: 120,
+          errorBuilder: (context, error, stackTrace) {
+            return placeholder;
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) {
+              return child;
+            }
+            return Center(
+              child: CircularProgressIndicator(
+                color: isDarkMode ? AppTheme.primaryColorDarkMode : AppTheme.primaryColor,
+                value:
+                    loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+              ),
+            );
+          },
+        ),
+      );
+    } else if (imageUrl.startsWith('assets/')) {
+      // Local asset image
+      return Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+        clipBehavior: Clip.antiAlias,
+        child: Image.asset(
+          imageUrl,
+          fit: BoxFit.cover,
+          width: 120,
+          height: 120,
+          errorBuilder: (context, error, stackTrace) {
+            return placeholder;
+          },
+        ),
+      );
+    } else {
+      // Fallback to placeholder image
+      return placeholder;
+    }
   }
 }

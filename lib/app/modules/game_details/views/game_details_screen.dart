@@ -6,6 +6,7 @@ import '../../../controllers/theme_controller.dart';
 import '../../../data/models/game_model.dart';
 import '../../../themes/app_theme.dart';
 import '../../../widgets/dark_mode_check.dart';
+import '../controllers/game_details_controller.dart';
 
 class GameDetailsScreen extends StatelessWidget {
   const GameDetailsScreen({super.key});
@@ -446,15 +447,7 @@ class GameDetailsScreen extends StatelessWidget {
                   Expanded(
                     flex: 3,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Get.snackbar(
-                          'Start Game',
-                          'Game starting functionality would be implemented here',
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
-                          colorText: isDarkMode ? Colors.white : Colors.black87,
-                        );
-                      },
+                      onPressed: _onStartGame,
                       icon: const Icon(Icons.play_arrow, color: Colors.white),
                       label: Text(
                         'Start Game',
@@ -723,5 +716,10 @@ class GameDetailsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _onStartGame() {
+    final gameDetailsController = Get.find<GameDetailsController>();
+    Get.toNamed('/game-play', arguments: gameDetailsController.game.value);
   }
 }

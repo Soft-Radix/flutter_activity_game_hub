@@ -5,6 +5,8 @@ import '../modules/categories/bindings/categories_binding.dart';
 import '../modules/categories/views/categories_screen.dart';
 import '../modules/game_details/bindings/game_details_binding.dart';
 import '../modules/game_details/views/game_details_screen.dart';
+import '../modules/game_play/bindings/game_play_binding.dart';
+import '../modules/game_play/views/game_play_screen.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_screen.dart';
 import '../modules/leaderboard/bindings/leaderboard_binding.dart';
@@ -29,6 +31,7 @@ abstract class AppRoutes {
   static const SPLASH = '/splash';
   static const CATEGORIES = '/categories';
   static const GAME_DETAILS = '/game-details';
+  static const GAME_PLAY = '/game-play';
   static const RANDOM_PICKER = '/random-picker';
   static const TIMER_SCOREBOARD = '/timer-scoreboard';
   static const LEADERBOARD = '/leaderboard';
@@ -69,6 +72,12 @@ class AppPages {
       name: AppRoutes.GAME_DETAILS,
       page: () => const GameDetailsScreen(),
       binding: GameDetailsBinding(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.GAME_PLAY,
+      page: () => const GamePlayScreen(),
+      binding: GamePlayBinding(),
       transition: Transition.rightToLeft,
     ),
     GetPage(

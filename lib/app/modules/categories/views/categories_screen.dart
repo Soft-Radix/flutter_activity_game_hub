@@ -388,18 +388,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildProfessionalLoadingIndicator(isDarkMode, primaryColor),
-                        const SizedBox(height: 16),
-                        Text(
-                          "Loading games...",
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                      children: [_buildProfessionalLoadingIndicator(isDarkMode, primaryColor)],
                     ),
                   );
                 }
@@ -1173,7 +1162,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
               // Description text
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
                   game.description,
                   style: TextStyle(fontSize: 14, color: subtitleColor, height: 1.3),
@@ -1182,42 +1171,39 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 ),
               ),
 
-              // Bottom section with game type, time and players
+              // Game type tag
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_getGameTypeIcon(game.gameType), size: 14, color: primaryColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        game.gameType,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // New bottom section with time/players in a row and View Game button on right
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Row(
                   children: [
-                    // Game type tag
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            game.teamBased ? Icons.group : _getGameTypeIcon(game.gameType),
-                            color: primaryColor,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            game.teamBased ? 'Cooperative' : game.gameType,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: primaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    // Time pill
+                    // Time info
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1234,9 +1220,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       ],
                     ),
 
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 16),
 
-                    // Players pill
+                    // Players info
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1252,38 +1238,34 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
 
-              // View Game button at the bottom
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: primaryColor,
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'View Game',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                    const Spacer(),
+
+                    // View Game button
+                    Container(
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'View Game',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                          Icon(Icons.chevron_right, color: Colors.white, size: 18),
-                        ],
+                            Icon(Icons.chevron_right, color: Colors.white, size: 18),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
