@@ -36,7 +36,7 @@ class NavigationController extends GetxController {
       case 1:
         return 'Random Picker';
       case 2:
-        return 'Leaderboard';
+        return 'Game History';
       case 3:
         return 'Settings';
       default:

@@ -15,6 +15,11 @@ class LeaderboardProvider extends GetxService {
     } else {
       _leaderboardBox = Hive.box<LeaderboardEntry>(_boxName);
     }
+
+    // Clear any existing data once on app startup
+    // This is temporary to remove any dummy/sample data
+    await _leaderboardBox.clear();
+
     return this;
   }
 

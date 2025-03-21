@@ -63,7 +63,7 @@ class MainLayout extends StatelessWidget {
                       BottomNavigationBarItem(icon: Icon(Icons.casino_rounded), label: 'Random'),
                       BottomNavigationBarItem(
                         icon: Icon(Icons.leaderboard_rounded),
-                        label: 'Leaderboard',
+                        label: 'Game History',
                       ),
                       BottomNavigationBarItem(
                         icon: Icon(Icons.settings_rounded),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 import 'package:random_string/random_string.dart';
@@ -32,8 +33,14 @@ class GameProvider extends GetxService {
   // Get a game by id
   Game? getGameById(String id) {
     try {
-      return _gamesBox.values.firstWhere((game) => game.id == id);
+      // More explicit approach without using orElse
+      final games = _gamesBox.values.where((game) => game.id == id).toList();
+      if (games.isNotEmpty) {
+        return games.first;
+      }
+      return null;
     } catch (e) {
+      debugPrint('Error in getGameById: $e');
       return null;
     }
   }

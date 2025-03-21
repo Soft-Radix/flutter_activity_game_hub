@@ -1,14 +1,19 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../controllers/leaderboard_controller.dart';
 import '../../../data/models/game_model.dart';
 
 class GamePlayController extends GetxController {
   // Game data
   final game = Rx<Game?>(null);
+
+  // Get leaderboard controller
+  final LeaderboardController _leaderboardController = Get.find<LeaderboardController>();
 
   // Timer related variables
   final minutes = 0.obs;
@@ -39,6 +44,12 @@ class GamePlayController extends GetxController {
 
   // Game materials checklist
   final checkedMaterials = <String, bool>{}.obs;
+
+  // Gameplay statistics for score calculation
+  final startTime = Rx<DateTime?>(null);
+  final endTime = Rx<DateTime?>(null);
+  final gameScore = 0.obs;
+  final playerName = 'You'.obs; // Default player name
 
   @override
   void onInit() {
@@ -234,6 +245,8 @@ class GamePlayController extends GetxController {
     }
 
     if (areAllMaterialsChecked()) {
+      // Record game start time
+      startTime.value = DateTime.now();
       completeSetup();
     } else {
       Get.snackbar(
@@ -262,9 +275,86 @@ class GamePlayController extends GetxController {
   void completeGame() {
     stopTimer();
     isGameCompleted.value = true;
-    // Navigate to results or leaderboard if needed
+
+    // Record game end time
+    endTime.value = DateTime.now();
+
+    // Calculate score
+    calculateGameScore();
+
+    // Save game history to leaderboard
+    _saveGameHistory();
+
+    // Play sound effect
     _playGameCompleteSound();
+
+    // Show completion dialog with score
     _showGameCompleteDialog();
+  }
+
+  // Save game history
+  Future<void> _saveGameHistory() async {
+    if (game.value == null) return;
+
+    try {
+      final String playerName = players.isNotEmpty ? players.first : this.playerName.value;
+
+      await _leaderboardController.addEntry(
+        playerOrTeamName: playerName,
+        gameId: game.value!.id,
+        gameName: game.value!.name,
+        score: gameScore.value,
+      );
+
+      debugPrint(
+        'Game history saved successfully for player: $playerName, game: ${game.value!.name}, score: ${gameScore.value}',
+      );
+    } catch (e) {
+      debugPrint('Error saving game history: $e');
+      // Show error to user
+      Get.snackbar(
+        'Error Saving Game',
+        'There was a problem saving your game to history. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade700,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(8),
+        borderRadius: 10,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  // Add score to leaderboard
+  Future<void> addScoreToLeaderboard() async {
+    if (game.value == null) return;
+
+    try {
+      // This is now handled by _saveGameHistory
+      // But we keep this to show feedback to user
+      Get.snackbar(
+        'Game History Saved',
+        'Your game play has been added to your history',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.shade700,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(8),
+        borderRadius: 10,
+        duration: const Duration(seconds: 3),
+      );
+    } catch (e) {
+      debugPrint('Error showing game history feedback: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to save your game to history',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade700,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(8),
+        borderRadius: 10,
+        duration: const Duration(seconds: 3),
+      );
+    }
   }
 
   void nextRound() {
@@ -342,11 +432,91 @@ class GamePlayController extends GetxController {
 
   // Dialog functions
   void _showTimerCompleteDialog() {
+    // Record game end time and calculate score
+    endTime.value = DateTime.now();
+    calculateGameScore();
+
+    // Save game history
+    _saveGameHistory();
+
     Get.dialog(
       AlertDialog(
-        title: const Text('Time\'s Up!'),
-        content: const Text('The timer has completed.'),
-        actions: [TextButton(onPressed: () => Get.back(), child: const Text('OK'))],
+        title: Row(
+          children: [
+            Icon(Icons.timer, color: Colors.orange, size: 28),
+            const SizedBox(width: 10),
+            const Text('Time\'s Up!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('The game timer has ended.'),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.blue.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.shade200.withOpacity(0.5),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Text(
+                '${gameScore.value}',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green.shade700),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This game has been saved to your history.',
+                      style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w500),
+                      textAlign: TextAlign.left,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Continue Playing')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Get.back();
+              isGameCompleted.value = true;
+              viewGameHistory();
+            },
+            icon: const Icon(Icons.history),
+            label: const Text('View Game History'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -354,18 +524,135 @@ class GamePlayController extends GetxController {
   void _showGameCompleteDialog() {
     Get.dialog(
       AlertDialog(
-        title: const Text('Game Completed'),
-        content: const Text('You have completed the game!'),
+        title: Row(
+          children: [
+            Icon(Icons.celebration, color: Colors.amber, size: 28),
+            const SizedBox(width: 10),
+            const Text('Game Completed!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.blue.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.shade200.withOpacity(0.5),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Text(
+                '${gameScore.value}',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text('Congratulations! You\'ve completed the game.', textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green.shade700),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This game has been saved to your history.',
+                      style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w500),
+                      textAlign: TextAlign.left,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {
               Get.back();
-              Get.back(); // Return to game details screen
+              Get.back(); // Return to game details
             },
             child: const Text('Return to Game'),
           ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Get.back();
+              viewGameHistory();
+            },
+            icon: const Icon(Icons.history),
+            label: const Text('View Game History'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+          ),
         ],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
+  }
+
+  // Calculate game score based on various factors
+  void calculateGameScore() {
+    if (game.value == null || startTime.value == null) return;
+
+    final Random random = Random();
+    int baseScore = 100; // Base score for completing a game
+
+    // Add difficulty bonus
+    switch (game.value!.difficultyLevel) {
+      case 'Easy':
+        baseScore += 20;
+        break;
+      case 'Medium':
+        baseScore += 50;
+        break;
+      case 'Hard':
+        baseScore += 80;
+        break;
+    }
+
+    // Add time bonus for time-bound games (faster completion = higher score)
+    if (game.value!.isTimeBound && startTime.value != null && endTime.value != null) {
+      final int allocatedTimeSeconds = game.value!.estimatedTimeMinutes * 60;
+      final int actualTimeSeconds = endTime.value!.difference(startTime.value!).inSeconds;
+
+      // If completed faster than allocated time, add bonus
+      if (actualTimeSeconds < allocatedTimeSeconds) {
+        final int timeBonus = ((allocatedTimeSeconds - actualTimeSeconds) / 10).floor();
+        baseScore += min(timeBonus, 100); // Cap time bonus at 100 points
+      }
+    }
+
+    // Add small random factor for variety
+    baseScore += random.nextInt(20);
+
+    // Store the calculated score
+    gameScore.value = baseScore;
+  }
+
+  // Navigate to game history
+  void viewGameHistory() {
+    if (game.value == null) return;
+
+    Get.toNamed('/leaderboard', arguments: {'gameId': game.value!.id});
   }
 }

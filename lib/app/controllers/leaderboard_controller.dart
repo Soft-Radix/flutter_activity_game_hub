@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../data/models/game_model.dart';
 import '../data/models/leaderboard_entry_model.dart';
+import '../data/providers/game_provider.dart';
 import '../data/providers/leaderboard_provider.dart';
 
 class LeaderboardController extends GetxController {
   final LeaderboardProvider _leaderboardProvider = Get.find<LeaderboardProvider>();
+  final GameProvider _gameProvider = Get.find<GameProvider>();
 
   // Observable variables
   final RxList<LeaderboardEntry> allEntries = <LeaderboardEntry>[].obs;
@@ -19,6 +22,44 @@ class LeaderboardController extends GetxController {
     loadLeaderboard();
   }
 
+  // Find a game by ID
+  Game? findGameById(String gameId) {
+    try {
+      final result = _gameProvider.getGameById(gameId);
+      return result; // This will return null if not found
+    } catch (e) {
+      debugPrint('Error finding game by ID: $e');
+      return null;
+    }
+  }
+
+  // Navigate to game details
+  void navigateToGameDetails(String gameId) {
+    try {
+      final game = findGameById(gameId);
+      if (game != null) {
+        Get.toNamed('/game-details', arguments: game);
+      } else {
+        Get.snackbar(
+          'Game Not Found',
+          'The selected game could not be found.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error navigating to game details: $e');
+      Get.snackbar(
+        'Error',
+        'Could not navigate to game details: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
   // Load leaderboard entries
   Future<void> loadLeaderboard() async {
     isLoading.value = true;
@@ -28,7 +69,7 @@ class LeaderboardController extends GetxController {
     } catch (e) {
       Get.snackbar(
         'Error',
-        'Failed to load leaderboard: ${e.toString()}',
+        'Failed to load game history: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -71,24 +112,65 @@ class LeaderboardController extends GetxController {
     filteredEntries.sort((a, b) => b.score.compareTo(a.score));
   }
 
-  // Get top players/teams (unique names, highest score)
-  List<Map<String, dynamic>> getTopPlayersOrTeams({int limit = 10}) {
-    final Map<String, int> playerScores = {};
+  // Get players with most games played (unique games count)
+  List<Map<String, Object>> getPlayersWithMostGames({int limit = 10}) {
+    final Map<String, Set<String>> playerGames = {};
 
-    // Calculate the highest score for each player/team
+    // Track unique games played by each player
     for (final entry in filteredEntries) {
-      final currentHighScore = playerScores[entry.playerOrTeamName] ?? 0;
-      if (entry.score > currentHighScore) {
-        playerScores[entry.playerOrTeamName] = entry.score;
+      if (!playerGames.containsKey(entry.playerOrTeamName)) {
+        playerGames[entry.playerOrTeamName] = <String>{};
+      }
+
+      // Add this game to the player's set of games
+      playerGames[entry.playerOrTeamName]!.add(entry.gameId);
+    }
+
+    // Convert to list and sort by number of unique games played
+    final List<Map<String, Object>> topGamers =
+        playerGames.entries
+            .map(
+              (e) => {
+                'name': e.key as Object,
+                'gamesCount': e.value.length as Object,
+                'gameIds': e.value.toList() as Object,
+              },
+            )
+            .toList();
+
+    topGamers.sort((a, b) => ((b['gamesCount'] as int).compareTo(a['gamesCount'] as int)));
+
+    return topGamers.take(limit).toList();
+  }
+
+  // Get user's global rank by games played
+  int getUserGlobalRankByGamesPlayed(String userName) {
+    final topPlayers = getPlayersWithMostGames(limit: 100);
+    for (int i = 0; i < topPlayers.length; i++) {
+      if (topPlayers[i]['name'] == userName) {
+        return i + 1;
+      }
+    }
+    return 0; // Not ranked
+  }
+
+  // Get recent games played by a player
+  List<LeaderboardEntry> getRecentGamesPlayedByUser(String userName, {int limit = 5}) {
+    final userEntries = _leaderboardProvider.getEntriesByPlayerOrTeam(userName);
+
+    // Sort by most recent date first
+    userEntries.sort((a, b) => b.datePlayed.compareTo(a.datePlayed));
+
+    // Find unique games (most recent entry of each game)
+    final Map<String, LeaderboardEntry> uniqueGames = {};
+    for (final entry in userEntries) {
+      if (!uniqueGames.containsKey(entry.gameId)) {
+        uniqueGames[entry.gameId] = entry;
       }
     }
 
-    // Convert to list and sort
-    final topPlayers = playerScores.entries.map((e) => {'name': e.key, 'score': e.value}).toList();
-
-    topPlayers.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
-
-    return topPlayers.take(limit).toList();
+    // Return most recent entries
+    return uniqueGames.values.toList().take(limit).toList();
   }
 
   // Add a new entry
@@ -111,7 +193,7 @@ class LeaderboardController extends GetxController {
 
       Get.snackbar(
         'Success',
-        'Score added to leaderboard',
+        'Game added to your history',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green,
         colorText: Colors.white,
@@ -119,7 +201,7 @@ class LeaderboardController extends GetxController {
     } catch (e) {
       Get.snackbar(
         'Error',
-        'Failed to add score: ${e.toString()}',
+        'Failed to add game to history: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -130,5 +212,26 @@ class LeaderboardController extends GetxController {
   // Get top entries for a specific game
   List<LeaderboardEntry> getTopEntriesForGame(String gameId, {int limit = 10}) {
     return _leaderboardProvider.getTopEntriesForGame(gameId: gameId, limit: limit);
+  }
+
+  // Get user's personal best scores across games
+  List<LeaderboardEntry> getUserPersonalBests(String userName) {
+    final userEntries = _leaderboardProvider.getEntriesByPlayerOrTeam(userName);
+
+    // Group by game and find best score for each
+    final Map<String, LeaderboardEntry> bestScoresByGame = {};
+
+    for (final entry in userEntries) {
+      final existingBest = bestScoresByGame[entry.gameId];
+      if (existingBest == null || entry.score > existingBest.score) {
+        bestScoresByGame[entry.gameId] = entry;
+      }
+    }
+
+    // Convert to list and sort by score (highest first)
+    final personalBests = bestScoresByGame.values.toList();
+    personalBests.sort((a, b) => b.score.compareTo(a.score));
+
+    return personalBests;
   }
 }

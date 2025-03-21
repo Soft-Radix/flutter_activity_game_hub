@@ -41,7 +41,7 @@ class LeaderboardScreen extends StatelessWidget {
               elevation: isDarkMode ? 0 : 2,
               shadowColor: isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.1),
               title: Text(
-                isGameSpecific ? 'Game Leaderboard' : 'Leaderboard',
+                isGameSpecific ? 'Game History' : 'Game History',
                 style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: isDarkMode ? Colors.white : Colors.black87,
@@ -98,7 +98,7 @@ class LeaderboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Leaderboard',
+                'Game History',
                 style: textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: isDarkMode ? Colors.white : Colors.black87,
@@ -106,7 +106,7 @@ class LeaderboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'View top players across all games',
+                'View your gaming activity and completed games',
                 style: textTheme.bodyMedium?.copyWith(
                   color: isDarkMode ? Colors.white70 : Colors.black54,
                 ),
@@ -217,36 +217,224 @@ class LeaderboardScreen extends StatelessWidget {
     LeaderboardController controller,
     bool isDarkMode,
   ) {
-    // Get the top players (name + highest score)
-    final topPlayers = controller.getTopPlayersOrTeams();
+    // Get the top players with most games played
+    final topGamers = controller.getPlayersWithMostGames();
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final currentUserName = 'You'; // This would come from user preferences in a real app
+    final userRank = controller.getUserGlobalRankByGamesPlayed(currentUserName);
+    final recentGames = controller.getRecentGamesPlayedByUser(currentUserName);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppTheme.padding),
-      color: isDarkMode ? const Color(0xFF1A1C2A) : Colors.grey.shade50,
-      child: AnimationLimiter(
-        child: ListView.builder(
-          padding: const EdgeInsets.only(top: AppTheme.padding, bottom: AppTheme.padding * 2),
-          itemCount: topPlayers.length,
-          itemBuilder: (context, index) {
-            return AnimationConfiguration.staggeredList(
-              position: index,
-              duration: const Duration(milliseconds: 375),
-              child: SlideAnimation(
-                verticalOffset: 50.0,
-                child: FadeInAnimation(
-                  child: _buildPlayerCard(
-                    context,
-                    name: topPlayers[index]['name'] as String,
-                    score: topPlayers[index]['score'] as int,
-                    rank: index + 1,
-                    isDarkMode: isDarkMode,
-                  ),
+    return Column(
+      children: [
+        // Add personal stats section at the top
+        if (userRank > 0)
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  isDarkMode ? const Color(0xFF4A6FFF) : Colors.blue.shade500,
+                  isDarkMode ? const Color(0xFF3051D3) : Colors.blue.shade700,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.sports_esports, color: Colors.white, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Your Rank (By Games Played)',
+                            style: textTheme.titleSmall?.copyWith(
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '#$userRank',
+                            style: textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Games Played',
+                          style: textTheme.titleSmall?.copyWith(
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${topGamers.firstWhere((p) => p['name'] == currentUserName, orElse: () => {'name': '', 'gamesCount': 0})['gamesCount']}',
+                          style: textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                // Add recent games
+                const SizedBox(height: 16),
+                const Divider(color: Colors.white24, height: 24),
+                Row(
+                  children: [
+                    Icon(Icons.history, color: Colors.amber, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Recently Played Games',
+                      style: textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Recent games list
+                SizedBox(
+                  height: 70,
+                  child:
+                      recentGames.isEmpty
+                          ? Center(
+                            child: Text(
+                              'No games played yet',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          )
+                          : ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: recentGames.length,
+                            itemBuilder: (context, index) {
+                              final entry = recentGames[index];
+                              return GestureDetector(
+                                onTap: () => controller.navigateToGameDetails(entry.gameId),
+                                child: Container(
+                                  width: 130,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        entry.gameName,
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: Colors.white.withOpacity(0.9),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _formatDate(entry.datePlayed),
+                                        style: textTheme.bodySmall?.copyWith(color: Colors.white70),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                ),
+              ],
+            ),
+          ),
+
+        // Improved section header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            children: [
+              Icon(
+                Icons.star_border_rounded,
+                size: 22,
+                color: isDarkMode ? Colors.blue.shade200 : Colors.blue.shade700,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Top Gaming Enthusiasts',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black87,
                 ),
               ),
-            );
-          },
+            ],
+          ),
         ),
-      ),
+
+        // Player entries
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            color: isDarkMode ? const Color(0xFF1A1C2A) : Colors.grey.shade50,
+            child: AnimationLimiter(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(top: 8, bottom: 16),
+                itemCount: topGamers.length,
+                itemBuilder: (context, index) {
+                  final bool isUser = topGamers[index]['name'] == currentUserName;
+
+                  return AnimationConfiguration.staggeredList(
+                    position: index,
+                    duration: const Duration(milliseconds: 375),
+                    child: SlideAnimation(
+                      verticalOffset: 50.0,
+                      child: FadeInAnimation(
+                        child: _buildPlayerGameCard(
+                          context,
+                          name: topGamers[index]['name'] as String,
+                          gamesCount: topGamers[index]['gamesCount'] as int,
+                          rank: index + 1,
+                          isDarkMode: isDarkMode,
+                          isCurrentUser: isUser,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -270,10 +458,10 @@ class LeaderboardScreen extends StatelessWidget {
               child: SlideAnimation(
                 verticalOffset: 50.0,
                 child: FadeInAnimation(
-                  child: _buildPlayerCard(
+                  child: _buildPlayerGameCard(
                     context,
                     name: entry.playerOrTeamName,
-                    score: entry.score,
+                    gamesCount: 1, // Single game entry
                     rank: index + 1,
                     date: entry.datePlayed,
                     isDarkMode: isDarkMode,
@@ -287,155 +475,148 @@ class LeaderboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPlayerCard(
+  Widget _buildPlayerGameCard(
     BuildContext context, {
     required String name,
-    required int score,
+    required int gamesCount,
     required int rank,
     DateTime? date,
     required bool isDarkMode,
+    bool isCurrentUser = false,
   }) {
     final textTheme = Theme.of(context).textTheme;
-    final cardColor = isDarkMode ? const Color(0xFF2D3142) : Colors.white;
 
-    return Card(
-      elevation: isDarkMode ? 4.0 : 0.0,
-      color: cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
-        side: isDarkMode ? BorderSide(color: Colors.grey.shade800, width: 1) : BorderSide.none,
+    // Dynamic colors based on rank
+    Color getRankColor() {
+      if (rank == 1) return Colors.amber; // Gold
+      if (rank == 2) return Colors.grey.shade300; // Silver
+      if (rank == 3) return Colors.brown.shade300; // Bronze
+      return isDarkMode ? Colors.white70 : Colors.black54;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color:
+            isCurrentUser
+                ? isDarkMode
+                    ? const Color(0xFF3051D3).withOpacity(0.15)
+                    : Colors.blue.shade50
+                : isDarkMode
+                ? const Color(0xFF252842)
+                : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border:
+            isCurrentUser
+                ? Border.all(color: isDarkMode ? const Color(0xFF4A6FFF) : Colors.blue, width: 1.5)
+                : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      margin: const EdgeInsets.only(bottom: AppTheme.padding),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
-          boxShadow:
-              isDarkMode
-                  ? []
-                  : ShadowUtils.getLightModeCardShadow(
-                    opacity: 0.08,
-                    blurRadius: 8,
-                    spreadRadius: 0,
-                    offset: const Offset(0, 3),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          children: [
+            // Rank container
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color:
+                    rank <= 3
+                        ? getRankColor().withOpacity(0.15)
+                        : isDarkMode
+                        ? Colors.white.withOpacity(0.1)
+                        : Colors.grey.shade100,
+                shape: BoxShape.circle,
+                border: rank <= 3 ? Border.all(color: getRankColor(), width: 1.5) : null,
+              ),
+              child: Center(
+                child: Text(
+                  '$rank',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color:
+                        rank <= 3
+                            ? getRankColor()
+                            : isDarkMode
+                            ? Colors.white
+                            : Colors.black87,
                   ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.padding),
-          child: Row(
-            children: [
-              // Rank circle
-              _buildRankCircle(context, rank, isDarkMode),
-              const SizedBox(width: 16),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
 
-              // Player info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.white : Colors.black87,
+            // Player info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w500,
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
+                        ),
                       ),
-                    ),
-                    if (date != null)
+                      if (isCurrentUser)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color:
+                                isDarkMode
+                                    ? const Color(0xFF4A6FFF).withOpacity(0.2)
+                                    : Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'You',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: isDarkMode ? Colors.blue.shade300 : Colors.blue.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.sports_esports,
+                        size: 12,
+                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                      ),
+                      const SizedBox(width: 4),
                       Text(
-                        _formatDate(date),
-                        style: textTheme.bodySmall?.copyWith(
+                        '$gamesCount ${gamesCount == 1 ? 'Game' : 'Games'} Played',
+                        style: textTheme.bodyMedium?.copyWith(
                           color: isDarkMode ? Colors.white70 : Colors.black54,
                         ),
                       ),
-                  ],
-                ),
-              ),
-
-              // Score
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color:
-                      isDarkMode
-                          ? const Color(0xFF5C6BC0).withOpacity(0.2)
-                          : const Color(0xFF4A6FFF).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border:
-                      isDarkMode
-                          ? Border.all(color: const Color(0xFF5C6BC0).withOpacity(0.5), width: 1)
-                          : null,
-                  boxShadow:
-                      isDarkMode
-                          ? null
-                          : [
-                            BoxShadow(
-                              color: const Color(0xFF4A6FFF).withOpacity(0.1),
-                              blurRadius: 4,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                ),
-                child: Text(
-                  '$score pts',
-                  style: textTheme.titleSmall?.copyWith(
-                    color: isDarkMode ? const Color(0xFF8C9EFF) : const Color(0xFF4A6FFF),
-                    fontWeight: FontWeight.bold,
+                    ],
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+
+            // Trophy icon for top 3
+            if (rank <= 3) Icon(Icons.emoji_events, color: getRankColor(), size: 24),
+          ],
         ),
       ),
     );
-  }
-
-  Widget _buildRankCircle(BuildContext context, int rank, bool isDarkMode) {
-    final size = rank <= 3 ? 48.0 : 40.0;
-    final color = _getRankColor(rank, isDarkMode);
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.4),
-            blurRadius: 8,
-            spreadRadius: isDarkMode ? 1 : 0,
-            offset: const Offset(0, 3),
-          ),
-        ],
-        border: rank <= 3 && !isDarkMode ? Border.all(color: Colors.white, width: 2) : null,
-      ),
-      child: Center(
-        child: Text(
-          '$rank',
-          style: TextStyle(
-            fontSize: rank <= 3 ? 20 : 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Color _getRankColor(int rank, bool isDarkMode) {
-    switch (rank) {
-      case 1:
-        return const Color(0xFFFFD700); // Gold
-      case 2:
-        return const Color(0xFFC0C0C0); // Silver
-      case 3:
-        return const Color(0xFFCD7F32); // Bronze
-      default:
-        return isDarkMode
-            ? const Color(0xFF5C6BC0) // A brighter indigo for dark mode
-            : const Color(0xFF4A6FFF).withOpacity(0.7);
-    }
   }
 
   Widget _buildFilterChip(
@@ -482,72 +663,43 @@ class LeaderboardScreen extends StatelessWidget {
 
   Widget _buildEmptyLeaderboard(BuildContext context, bool isDarkMode) {
     final textTheme = Theme.of(context).textTheme;
+    final leaderboardController = Get.find<LeaderboardController>();
 
-    return Container(
-      color: isDarkMode ? const Color(0xFF1A1C2A) : Colors.grey.shade50,
-      child: Center(
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 100,
-              height: 100,
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
-                color: isDarkMode ? const Color(0xFF252842) : Colors.white,
+                color: isDarkMode ? const Color(0xFF252842) : const Color(0xFFEFF1FD),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDarkMode ? 0.2 : 0.05),
-                    blurRadius: 10,
-                    spreadRadius: isDarkMode ? 1 : 0,
-                  ),
-                ],
               ),
               child: Icon(
-                Icons.emoji_events_outlined,
+                Icons.sports_esports,
                 size: 60,
-                color:
-                    isDarkMode
-                        ? const Color(0xFF5C6BC0).withOpacity(0.7)
-                        : const Color(0xFF4A6FFF).withOpacity(0.7),
+                color: isDarkMode ? Colors.blue.shade200 : Colors.blue.shade700,
               ),
             ),
-            const SizedBox(height: 24),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(AppTheme.padding),
-              decoration: BoxDecoration(
-                color: isDarkMode ? const Color(0xFF252842) : Colors.white,
-                borderRadius: BorderRadius.circular(AppTheme.cardBorderRadius),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDarkMode ? 0.2 : 0.05),
-                    blurRadius: 10,
-                    spreadRadius: isDarkMode ? 1 : 0,
-                  ),
-                ],
-                border: isDarkMode ? Border.all(color: Colors.grey.shade800, width: 1) : null,
+            const SizedBox(height: 32),
+            Text(
+              'No game history yet',
+              style: textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black87,
               ),
-              child: Column(
-                children: [
-                  Text(
-                    'No leaderboard entries yet',
-                    style: textTheme.headlineSmall?.copyWith(
-                      color: isDarkMode ? Colors.white : Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Play some games to start seeing scores on the leaderboard!',
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Play some games to start building your gaming history!',
+              style: textTheme.bodyLarge?.copyWith(
+                color: isDarkMode ? Colors.white70 : Colors.black54,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

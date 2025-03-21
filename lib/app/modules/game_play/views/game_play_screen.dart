@@ -772,22 +772,60 @@ class GamePlayScreen extends GetView<GamePlayController> {
             ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
+          Container(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: (isDarkMode ? const Color(0xFF558B2F) : const Color(0xFF4CAF50))
+                      .withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
               onPressed: controller.completeGame,
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('COMPLETE GAME'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: isDarkMode ? const Color(0xFF558B2F) : const Color(0xFF4CAF50),
                 foregroundColor: Colors.white,
                 elevation: isDarkMode ? 4 : 0,
-                shadowColor:
-                    isDarkMode
-                        ? Colors.black.withOpacity(0.3)
-                        : const Color(0xFF4CAF50).withOpacity(0.3),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_outline, size: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        'COMPLETE GAME',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.history, size: 14, color: Colors.white.withOpacity(0.8)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Game will be added to history',
+                        style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.8)),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
