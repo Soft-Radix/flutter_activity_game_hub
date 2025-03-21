@@ -189,7 +189,13 @@ class GeminiApiService {
     
     Each game should include id, name, description, category, imageUrl, minPlayers, maxPlayers, estimatedTimeMinutes, 
     instructions (as array of strings), isFeatured, difficultyLevel, materialsRequired (as array of strings), 
-    gameType, rating, isTimeBound, teamBased, rules (as array of strings), and howToPlay.
+    gameType, rating, isTimeBound, teamBased, rules (as array of strings), howToPlay, 
+    winnerGamePlayerOrTeam (a detailed description of who wins the game), and
+    outOfPlayRules (an array of 3-5 rules for when players are eliminated or out of the game).
+    
+    For each game:
+    - The "winnerGamePlayerOrTeam" field should describe in 1-2 sentences who or which team wins the game and how.
+    - The "outOfPlayRules" should be an array of 3-5 strings describing conditions when players are eliminated or out of play.
     
     Generate creative and interesting games that are not commonly known or popular.
     Ensure high variety in the types of games, player counts, and durations.
@@ -409,7 +415,12 @@ class GeminiApiService {
       Generate detailed information for a game with ID "$id" in JSON format.
       The game should include id, name, description, category, imageUrl, minPlayers, maxPlayers, estimatedTimeMinutes, 
       instructions (as array of strings), isFeatured, difficultyLevel, materialsRequired (as array of strings), 
-      gameType, rating, isTimeBound, teamBased, rules (as array of strings), and a detailed howToPlay explanation.
+      gameType, rating, isTimeBound, teamBased, rules (as array of strings), a detailed howToPlay explanation,
+      winnerGamePlayerOrTeam (a detailed description of who wins the game), and
+      outOfPlayRules (an array of 3-5 rules for when players are eliminated or out of the game).
+      
+      The "winnerGamePlayerOrTeam" field should describe in 1-2 sentences who or which team wins the game and how.
+      The "outOfPlayRules" should be an array of 3-5 strings describing conditions when players are eliminated or out of play.
       
       IMPORTANT: For the imageUrl field, provide a descriptive search query that can be used to find an appropriate image on Unsplash.
       The search query should be 2-5 words describing the game's theme or activity. For example: "team building outdoors", "office icebreaker game", "kids puzzle challenge", etc.
@@ -720,6 +731,8 @@ Remember to ONLY return the JSON array, nothing else.
           teamBased: game.teamBased,
           rules: game.rules,
           howToPlay: game.howToPlay,
+          winnerGamePlayerOrTeam: game.winnerGamePlayerOrTeam,
+          outOfPlayRules: game.outOfPlayRules,
         );
 
         processedGames.add(updatedGame);
@@ -766,10 +779,263 @@ Remember to ONLY return the JSON array, nothing else.
         teamBased: game.teamBased,
         rules: game.rules,
         howToPlay: game.howToPlay,
+        winnerGamePlayerOrTeam: game.winnerGamePlayerOrTeam,
+        outOfPlayRules: game.outOfPlayRules,
       );
     }
 
     // If the imageUrl is already valid, return the game as is
     return game;
+  }
+
+  // Add a new method to get out of play rules from Gemini for a specific game
+  Future<List<String>> getOutOfPlayRules(Game game) async {
+    try {
+      // Build a prompt to get out of play rules for the game
+      final prompt = """
+Generate a list of 4-6 "Out of Play Rules" for the game "${game.name}". 
+These rules indicate when a player is out of the game or cannot continue playing.
+
+Game Description: ${game.description}
+Game Type: ${game.gameType}
+Difficulty: ${game.difficultyLevel}
+Number of Players: ${game.minPlayers} - ${game.maxPlayers}
+
+Return only a JSON array of strings in the following format:
+["Rule 1", "Rule 2", "Rule 3", ...]
+
+Each rule should:
+- Be clear and specific
+- Focus on conditions that eliminate a player
+- Be relevant to the game type and mechanics
+- Be appropriate for the difficulty level
+- Be easy to understand and enforce
+
+Example format:
+["Player steps outside the boundary", "Player breaks any main rule twice", "Player fails to complete their turn within 20 seconds"]
+""";
+
+      lastPrompt = prompt;
+
+      // Get API key
+      final apiKey = await ApiConfig.getGeminiApiKey();
+
+      // Check if API key is valid
+      if (apiKey.startsWith("PLEASE_ADD_YOUR_GEMINI_API_KEY")) {
+        debugPrint("Please add your Gemini API key to api_config.dart");
+        return [];
+      }
+
+      // Prepare headers and data
+      final headers = {'Content-Type': 'application/json'};
+      final data = {
+        "contents": [
+          {
+            "parts": [
+              {"text": prompt},
+            ],
+          },
+        ],
+        "generationConfig": {
+          "temperature": 0.4,
+          "topK": 32,
+          "topP": 0.8,
+          "maxOutputTokens": 800,
+          "responseMimeType": "application/json",
+          "responseSchema": {
+            "type": "array",
+            "items": {"type": "string"},
+          },
+        },
+        "safetySettings": [
+          {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+          {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+          {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+          {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+        ],
+      };
+
+      // Add API key and make the API call
+      final response = await _dio.post(
+        "$apiUrl?key=$apiKey",
+        data: data,
+        options: Options(headers: headers),
+      );
+
+      lastRawResponse = jsonEncode(response.data);
+
+      // Extract the outOfPlayRules array from the JSON response
+      final candidates = response.data['candidates'] as List<dynamic>;
+
+      if (candidates.isEmpty) {
+        return [];
+      }
+
+      final content = candidates.first['content'] as Map<String, dynamic>;
+      final parts = content['parts'] as List<dynamic>;
+
+      if (parts.isEmpty) {
+        return [];
+      }
+
+      // Extract the JSON array from the text response
+      final jsonText = parts.first['text'] as String;
+
+      // Sometimes Gemini returns markdown with code blocks or extra text
+      final jsonRegExp = RegExp(r'\[.*?\]', dotAll: true);
+      final match = jsonRegExp.firstMatch(jsonText);
+
+      if (match == null) {
+        return [];
+      }
+
+      final jsonArray = match.group(0);
+      lastParsedJson = jsonArray ?? '';
+
+      // Parse the JSON array
+      final List<dynamic> outOfPlayRulesList = jsonDecode(jsonArray!);
+
+      // Convert to List<String>
+      return outOfPlayRulesList.map((rule) => rule.toString()).toList();
+    } catch (e) {
+      debugPrint('Error getting out of play rules: $e');
+      return [];
+    }
+  }
+
+  // Add a new method to get winner and eliminated player information from Gemini for a specific game
+  Future<Map<String, String>> getGameWinnerInfo(Game game) async {
+    try {
+      // Build a prompt to get winner and eliminated player information for the game
+      final prompt = """
+Generate winner and eliminated player information for the game "${game.name}".
+Based on the game description and rules, identify:
+1. The winner condition - who or which team wins the game
+2. Elimination condition - when players get eliminated or out of play
+
+Game Description: ${game.description}
+Game Type: ${game.gameType}
+Difficulty: ${game.difficultyLevel}
+Number of Players: ${game.minPlayers} - ${game.maxPlayers}
+Game Rules: ${game.rules.join('. ')}
+
+Return the results as a JSON object with the following structure:
+{
+  "winner": "Description of who/what team wins and how",
+  "eliminated": "Description of how players get eliminated"
+}
+
+The descriptions should be:
+- Clear and specific
+- Based on the game's rules and mechanics
+- Relevant to the game type
+- Easy to understand
+- 1-2 sentences in length
+""";
+
+      lastPrompt = prompt;
+
+      // Get API key
+      final apiKey = await ApiConfig.getGeminiApiKey();
+
+      // Check if API key is valid
+      if (apiKey.startsWith("PLEASE_ADD_YOUR_GEMINI_API_KEY")) {
+        debugPrint("Please add your Gemini API key to api_config.dart");
+        return {
+          "winner": "The player or team that completes the objective first.",
+          "eliminated": "Players who break the game rules or fail to meet objectives.",
+        };
+      }
+
+      // Prepare headers and data
+      final headers = {'Content-Type': 'application/json'};
+      final data = {
+        "contents": [
+          {
+            "parts": [
+              {"text": prompt},
+            ],
+          },
+        ],
+        "generationConfig": {
+          "temperature": 0.3,
+          "topK": 32,
+          "topP": 0.8,
+          "maxOutputTokens": 800,
+          "responseMimeType": "application/json",
+        },
+        "safetySettings": [
+          {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+          {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+          {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+          {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+        ],
+      };
+
+      // Add API key and make the API call
+      final response = await _dio.post(
+        "$apiUrl?key=$apiKey",
+        data: data,
+        options: Options(headers: headers),
+      );
+
+      lastRawResponse = jsonEncode(response.data);
+
+      // Extract the response from Gemini
+      final candidates = response.data['candidates'] as List<dynamic>;
+
+      if (candidates.isEmpty) {
+        return {
+          "winner": "The player or team that completes the objective first.",
+          "eliminated": "Players who break the game rules or fail to meet objectives.",
+        };
+      }
+
+      final content = candidates.first['content'] as Map<String, dynamic>;
+      final parts = content['parts'] as List<dynamic>;
+
+      if (parts.isEmpty) {
+        return {
+          "winner": "The player or team that completes the objective first.",
+          "eliminated": "Players who break the game rules or fail to meet objectives.",
+        };
+      }
+
+      // Extract the JSON from the text response
+      final jsonText = parts.first['text'] as String;
+
+      // Sometimes Gemini returns markdown with code blocks or extra text
+      final jsonRegExp = RegExp(r'\{.*?\}', dotAll: true);
+      final match = jsonRegExp.firstMatch(jsonText);
+
+      if (match == null) {
+        return {
+          "winner": "The player or team that completes the objective first.",
+          "eliminated": "Players who break the game rules or fail to meet objectives.",
+        };
+      }
+
+      final jsonObject = match.group(0);
+      lastParsedJson = jsonObject ?? '';
+
+      // Parse the JSON object
+      final Map<String, dynamic> gameInfo = jsonDecode(jsonObject!);
+
+      // Return the winner and eliminated information
+      return {
+        "winner":
+            gameInfo['winner'] as String? ??
+            "The player or team that completes the objective first.",
+        "eliminated":
+            gameInfo['eliminated'] as String? ??
+            "Players who break the game rules or fail to meet objectives.",
+      };
+    } catch (e) {
+      debugPrint('Error getting game winner info: $e');
+      return {
+        "winner": "The player or team that completes the objective first.",
+        "eliminated": "Players who break the game rules or fail to meet objectives.",
+      };
+    }
   }
 }

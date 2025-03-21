@@ -58,6 +58,12 @@ class Game {
   @HiveField(17)
   final String howToPlay; // Detailed explanation of how to play
 
+  @HiveField(18)
+  final String winnerGamePlayerOrTeam; // Winner of the game
+
+  @HiveField(19)
+  final List<String> outOfPlayRules; // List of rules for the game
+
   Game({
     required this.id,
     required this.name,
@@ -77,6 +83,8 @@ class Game {
     required this.teamBased,
     required this.rules,
     required this.howToPlay,
+    this.winnerGamePlayerOrTeam = '', // Default empty value
+    this.outOfPlayRules = const [], // Default empty list
   });
 
   // Factory constructor to create a Game from a Map
@@ -100,6 +108,9 @@ class Game {
       teamBased: json['teamBased'] as bool,
       rules: List<String>.from(json['rules']),
       howToPlay: json['howToPlay'] as String,
+      winnerGamePlayerOrTeam: json['winnerGamePlayerOrTeam'] as String? ?? '',
+      outOfPlayRules:
+          json['outOfPlayRules'] != null ? List<String>.from(json['outOfPlayRules']) : [],
     );
   }
 
@@ -124,6 +135,8 @@ class Game {
       'teamBased': teamBased,
       'rules': rules,
       'howToPlay': howToPlay,
+      'winnerGamePlayerOrTeam': winnerGamePlayerOrTeam,
+      'outOfPlayRules': outOfPlayRules,
     };
   }
 }

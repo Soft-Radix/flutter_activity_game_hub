@@ -75,10 +75,21 @@ class GameDetailsScreen extends StatelessWidget {
                         child: Hero(
                           tag: 'game-image-${game.id}',
                           child: Center(
-                            child: SizedBox(
+                            child: Container(
                               height: screenSize.height * 0.12,
                               width: screenSize.height * 0.12,
-                              child: _buildGameImage(game.imageUrl, isDarkMode),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 4,
+                                    spreadRadius: 0,
+                                  ),
+                                ],
+                              ),
+                              child: Center(child: _buildGameImage(game.imageUrl, isDarkMode)),
                             ),
                           ),
                         ),
@@ -150,55 +161,17 @@ class GameDetailsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Category badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color:
-                                isDarkMode
-                                    ? const Color(0xFF3051D3).withOpacity(0.2)
-                                    : const Color(0xFFEFF1FD),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            game.category,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF4A6FFF),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Players and time row (matches screenshot)
                         Row(
                           children: [
-                            Icon(
-                              Icons.people_outline,
-                              size: 20,
-                              color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${game.minPlayers}-${game.maxPlayers} players',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: isDarkMode ? Colors.white : Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            Icon(
-                              Icons.access_time,
-                              size: 20,
-                              color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${game.estimatedTimeMinutes} min',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: isDarkMode ? Colors.white : Colors.black87,
-                              ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 8),
+
+                        // Second row with Game Type
                       ],
                     ),
                   ),
@@ -219,33 +192,128 @@ class GameDetailsScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    child: Column(
                       children: [
-                        _buildFeatureItem(
-                          Icons.category_outlined,
-                          'Competitive',
-                          Colors.blue,
-                          textTheme,
-                          isDarkMode,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildFeatureItem(
+                              Icons.category_outlined,
+                              'Competitive',
+                              Colors.blue,
+                              textTheme,
+                              isDarkMode,
+                            ),
+                            _buildFeatureItem(
+                              game.isTimeBound ? Icons.timer : Icons.timer_off,
+                              'Time Bound',
+                              game.isTimeBound ? Colors.orange : Colors.grey,
+                              textTheme,
+                              isDarkMode,
+                            ),
+                            _buildFeatureItem(
+                              game.teamBased ? Icons.group : Icons.person,
+                              'Team Based',
+                              game.teamBased ? Colors.green : Colors.purple,
+                              textTheme,
+                              isDarkMode,
+                            ),
+                          ],
                         ),
-                        _buildFeatureItem(
-                          game.isTimeBound ? Icons.timer : Icons.timer_off,
-                          'Time Bound',
-                          game.isTimeBound ? Colors.orange : Colors.grey,
-                          textTheme,
-                          isDarkMode,
-                        ),
-                        _buildFeatureItem(
-                          game.teamBased ? Icons.group : Icons.person,
-                          'Team Based',
-                          game.teamBased ? Colors.green : Colors.purple,
-                          textTheme,
-                          isDarkMode,
+
+                        const SizedBox(height: 16),
+
+                        // Key game parameters
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          children: [
+                            _buildGameTag(
+                              "Category: ${game.category}",
+                              Icons.category,
+                              Colors.purple,
+                              textTheme,
+                              isDarkMode,
+                            ),
+                            _buildGameTag(
+                              "Difficulty: ${game.difficultyLevel}",
+                              _getDifficultyIcon(game.difficultyLevel),
+                              _getDifficultyColor(game.difficultyLevel),
+                              textTheme,
+                              isDarkMode,
+                            ),
+                            _buildGameTag(
+                              "Game Type: ${game.gameType}",
+                              Icons.sports_esports,
+                              Colors.green,
+                              textTheme,
+                              isDarkMode,
+                            ),
+                            _buildGameTag(
+                              "Players: ${game.minPlayers}-${game.maxPlayers}",
+                              Icons.people,
+                              Colors.blue,
+                              textTheme,
+                              isDarkMode,
+                            ),
+                            _buildGameTag(
+                              "Time: ${game.estimatedTimeMinutes} min",
+                              Icons.timer,
+                              Colors.orange,
+                              textTheme,
+                              isDarkMode,
+                            ),
+                            if (game.isFeatured)
+                              _buildGameTag(
+                                "Featured",
+                                Icons.star,
+                                Colors.amber,
+                                textTheme,
+                                isDarkMode,
+                              ),
+                          ],
                         ),
                       ],
                     ),
                   ),
+
+                  // How to Play Overview section
+                  if (game.howToPlay.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? const Color(0xFF252842) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            spreadRadius: 0,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'How to Play Overview',
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            game.howToPlay,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: isDarkMode ? Colors.white70 : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // Description section
                   if (game.description.isNotEmpty)
@@ -363,7 +431,7 @@ class GameDetailsScreen extends StatelessWidget {
                   // Rules section (if present)
                   if (game.rules.isNotEmpty)
                     Container(
-                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: isDarkMode ? const Color(0xFF252842) : Colors.white,
@@ -392,6 +460,215 @@ class GameDetailsScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+
+                  // Winner & Elimination Rules Section - moved to the end
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? const Color(0xFF252842) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Section header
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.emoji_events_outlined,
+                              color: isDarkMode ? Colors.amber : Colors.orange,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Winner & Elimination Rules',
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Winner information
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? const Color(0xFF303450) : Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color:
+                                      isDarkMode
+                                          ? Colors.blue.shade900.withOpacity(0.3)
+                                          : Colors.blue.shade100,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.emoji_events, color: Colors.amber, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Winner Condition',
+                                      style: textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            isDarkMode
+                                                ? Colors.blue.shade300
+                                                : Colors.blue.shade800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                game.winnerGamePlayerOrTeam.isNotEmpty
+                                    ? game.winnerGamePlayerOrTeam
+                                    : 'The team or player who successfully completes the objective first.',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: isDarkMode ? Colors.white : Colors.black87,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Out of Play Rules
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? const Color(0xFF303450) : Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDarkMode ? Colors.orange.shade800 : Colors.orange.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color:
+                                      isDarkMode
+                                          ? Colors.orange.shade900.withOpacity(0.3)
+                                          : Colors.orange.shade100,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Colors.orange,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Elimination Rules',
+                                      style: textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            isDarkMode
+                                                ? Colors.orange.shade300
+                                                : Colors.orange.shade800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              game.outOfPlayRules.isNotEmpty
+                                  ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children:
+                                        game.outOfPlayRules.map((rule) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(bottom: 8.0),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Container(
+                                                  margin: const EdgeInsets.only(top: 4),
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        isDarkMode
+                                                            ? Colors.orange.withOpacity(0.2)
+                                                            : Colors.orange.withOpacity(0.1),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.block,
+                                                    size: 10,
+                                                    color:
+                                                        isDarkMode
+                                                            ? Colors.orange.shade300
+                                                            : Colors.orange.shade800,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Text(
+                                                    rule,
+                                                    style: textTheme.bodyMedium?.copyWith(
+                                                      color:
+                                                          isDarkMode
+                                                              ? Colors.white
+                                                              : Colors.black87,
+                                                      height: 1.4,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }).toList(),
+                                  )
+                                  : Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                    child: Text(
+                                      'No elimination rules specified for this game.',
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                   // Add bottom padding to ensure content isn't cut off
                   const SizedBox(height: 24),
@@ -607,6 +884,48 @@ class GameDetailsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildOutOfPlayRulesList(
+    List<String> outOfPlayRules,
+    TextTheme textTheme,
+    bool isDarkMode,
+  ) {
+    return Column(
+      children: List.generate(outOfPlayRules.length, (index) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: index == outOfPlayRules.length - 1 ? 0 : 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color:
+                      isDarkMode ? Colors.amber.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.block, // Using block icon to emphasize "out of play"
+                  size: 12,
+                  color: isDarkMode ? Colors.amber : Colors.orange,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  outOfPlayRules[index],
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: isDarkMode ? Colors.amber[200] : Colors.orange[800],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
   Color _getDifficultyColor(String difficultyLevel) {
     // Implement your logic to determine the color based on the difficulty level
     // For example, you can use a switch statement or a map to return the appropriate color
@@ -721,5 +1040,44 @@ class GameDetailsScreen extends StatelessWidget {
   void _onStartGame() {
     final gameDetailsController = Get.find<GameDetailsController>();
     Get.toNamed('/game-play', arguments: gameDetailsController.game.value);
+  }
+
+  // NEW: Helper method to build a game tag
+  Widget _buildGameTag(
+    String label,
+    IconData icon,
+    Color color,
+    TextTheme textTheme,
+    bool isDarkMode,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4, right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color:
+            isDarkMode
+                ? Color.alphaBlend(color.withOpacity(0.15), const Color(0xFF303450))
+                : color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDarkMode ? color.withOpacity(0.3) : color.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: textTheme.bodySmall?.copyWith(
+              color: isDarkMode ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
