@@ -69,6 +69,20 @@ class _RandomPickerScreenState extends State<RandomPickerScreen> with TickerProv
     _animationController.forward();
   }
 
+  // Helper method to get difficulty color
+  Color _getDifficultyColor(String difficultyLevel, bool isDarkMode) {
+    switch (difficultyLevel) {
+      case 'Easy':
+        return Colors.green;
+      case 'Medium':
+        return Colors.amber;
+      case 'Hard':
+        return Colors.red;
+      default:
+        return isDarkMode ? Colors.white : Colors.black87;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -273,6 +287,50 @@ class _RandomPickerScreenState extends State<RandomPickerScreen> with TickerProv
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 16),
+
+                                  // Rating and Difficulty row
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // Rating display
+                                      Icon(Icons.star, color: Colors.amber, size: 18),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${_selectedGame!.rating}',
+                                        style: textTheme.bodyMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: isDarkMode ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+
+                                      // Difficulty level
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _getDifficultyColor(
+                                            _selectedGame!.difficultyLevel,
+                                            isDarkMode,
+                                          ),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          _selectedGame!.difficultyLevel,
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 12),
+
+                                  // Player count and time info
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [

@@ -1170,110 +1170,88 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final bool isSearchResults = _searchController.text.isNotEmpty;
 
     return Center(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isSearchResults ? Icons.search_off : Icons.category_outlined,
-                size: 56,
-                color: isDarkMode ? Colors.white38 : Colors.black38,
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSearchResults ? Icons.search_off : Icons.category_outlined,
+              size: 64,
+              color: isDarkMode ? Colors.white38 : Colors.black38,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              isSearchResults ? "No results" : "No categories available",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
               ),
-              const SizedBox(height: 20),
-              Text(
-                isSearchResults ? "No Games Found" : "No Categories Available",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white70 : Colors.black87,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 280),
-                child: Text(
-                  isSearchResults
-                      ? "Try adjusting your search filters or try a different keyword"
-                      : "The selected categories have been removed",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isDarkMode ? Colors.white54 : Colors.black54,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isSearchResults
+                  ? "No games found for \"${_searchController.text}\". Try a different search term."
+                  : "The selected categories have been removed",
+              style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white54 : Colors.black54),
+              textAlign: TextAlign.center,
+            ),
+            if (_isGeminiMode.value && !isSearchResults) ...[
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.arrow_upward, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Enter a search term and click a Search button",
+                    style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
                   ),
-                  textAlign: TextAlign.center,
-                ),
+                ],
               ),
-              if (_isGeminiMode.value && !isSearchResults) ...[
-                const SizedBox(height: 24),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 250),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.arrow_upward, color: Colors.blue, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              "Enter a search term above",
-                              style: TextStyle(
-                                color: Colors.blue,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline, size: 14, color: Colors.blue.shade700),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              "Use any search button to find games",
-                              style: TextStyle(color: Colors.blue.shade700, fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  Text(
+                    "You can use either the main Search button or the Search icon",
+                    style: TextStyle(color: Colors.blue.shade700, fontSize: 13),
                   ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              if (isSearchResults)
-                // Use a column instead of row for small screens
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _searchGamesWithGemini,
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: const Text("Reset All Filters"),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        _searchController.clear();
-                        _filteredGames.clear();
-                      },
-                      icon: const Icon(Icons.clear, size: 18),
-                      label: const Text("Clear Search"),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                    ),
-                  ],
-                ),
+                ],
+              ),
             ],
-          ),
+            const SizedBox(height: 24),
+            if (isSearchResults && _isGeminiMode.value)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _searchGamesWithGemini,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text("Try Again"),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _searchController.clear();
+                      _filteredGames.clear();
+                    },
+                    icon: const Icon(Icons.clear),
+                    label: const Text("Clear Search"),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+          ],
         ),
       ),
     );

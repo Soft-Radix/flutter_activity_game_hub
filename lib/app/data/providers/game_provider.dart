@@ -97,9 +97,7 @@ class GameProvider extends GetxService {
         rating: 4.5,
         isTimeBound: true,
         teamBased: true,
-        rules: [
-          'Each team has a designated drawing area',
-        ],
+        rules: ['Each team has a designated drawing area'],
         howToPlay: 'Each team has a designated drawing area',
       ),
       Game(
@@ -161,7 +159,6 @@ class GameProvider extends GetxService {
           'The drawing area should be well-lit',
           'The drawing area should be well-ventilated',
           'The drawing area should be well-ventilated',
-          
         ],
         howToPlay: 'Each team has a designated drawing area',
       ),

@@ -93,6 +93,31 @@ class FeaturedGameCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        // Update text overlay at the bottom of the image
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            color: Colors.black.withOpacity(0.6),
+                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.update, size: 16, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Updates every 5 minutes',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.white,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
 

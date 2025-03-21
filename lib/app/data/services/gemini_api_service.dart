@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -169,12 +170,129 @@ class GeminiApiService {
     );
   }
 
+  // Build prompt with specific instructions for Gemini
+  String _buildPrompt({
+    String? category,
+    int? minPlayers,
+    int? maxPlayers,
+    int? maxTimeMinutes,
+    int gameCount = 5,
+  }) {
+    // Add randomness to ensure different responses each time
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final randomSeed = DateTime.now().microsecondsSinceEpoch % 10000;
+
+    String basePrompt = '''
+    Generate a list of activity games in JSON format. 
+    Make sure to create unique, varied, and different games than previous requests.
+    Use randomization seed: $randomSeed and timestamp: $timestamp to ensure variety.
+    
+    Each game should include id, name, description, category, imageUrl, minPlayers, maxPlayers, estimatedTimeMinutes, 
+    instructions (as array of strings), isFeatured, difficultyLevel, materialsRequired (as array of strings), 
+    gameType, rating, isTimeBound, teamBased, rules (as array of strings), and howToPlay.
+    
+    Generate creative and interesting games that are not commonly known or popular.
+    Ensure high variety in the types of games, player counts, and durations.
+    
+    Return the response as a valid JSON array only, without any additional text, explanation, or markdown formatting.
+    Do not include any text before or after the JSON array.
+    ''';
+
+    // Add filters to the prompt
+    List<String> filters = [];
+
+    if (category != null) {
+      filters.add('The category must be "$category".');
+    }
+
+    if (minPlayers != null) {
+      filters.add(
+        'The games must support at least $minPlayers players (minPlayers ≥ $minPlayers).',
+      );
+    }
+
+    if (maxPlayers != null) {
+      filters.add(
+        'The games must not require more than $maxPlayers players (maxPlayers ≤ $maxPlayers).',
+      );
+    }
+
+    if (maxTimeMinutes != null) {
+      filters.add(
+        'The games must not take longer than $maxTimeMinutes minutes (estimatedTimeMinutes ≤ $maxTimeMinutes).',
+      );
+    }
+
+    if (filters.isNotEmpty) {
+      basePrompt += '\n\nAdditional requirements:\n';
+      for (var filter in filters) {
+        basePrompt += '- $filter\n';
+      }
+    }
+
+    basePrompt += '\n\nProvide exactly $gameCount games in the response.';
+
+    // Add a request for novelty to avoid repetition
+    basePrompt +=
+        '\n\nIMPORTANT: Make these games different from any previous responses. Create completely unique games not commonly known.';
+
+    return basePrompt;
+  }
+
+  // Get a single random game
+  Future<Game?> getRandomGame() async {
+    try {
+      // Use different categories, player counts, or time limits each time to increase variability
+      final randomOptions = [
+        {'category': 'Team-Building'},
+        {'category': 'Party Games'},
+        {'category': 'Brain Games'},
+        {'category': 'Icebreakers'},
+        {'category': 'Outdoor Games'},
+        {'minPlayers': 2, 'maxPlayers': 6},
+        {'minPlayers': 4, 'maxPlayers': 10},
+        {'minPlayers': 3, 'maxPlayers': 20},
+        {'maxTimeMinutes': 15},
+        {'maxTimeMinutes': 30},
+        {'maxTimeMinutes': 45},
+        {}, // Empty for no specific filters
+      ];
+
+      // Pick a random set of options
+      final random = Random();
+      final options = randomOptions[random.nextInt(randomOptions.length)];
+
+      // Add temperature variation to increase randomness
+      final temperature = 0.6 + (random.nextDouble() * 0.4); // Between 0.6 and 1.0
+
+      // Request just one game from Gemini with random options
+      final games = await getGames(
+        category: options['category'] as String?,
+        minPlayers: options['minPlayers'] as int?,
+        maxPlayers: options['maxPlayers'] as int?,
+        maxTimeMinutes: options['maxTimeMinutes'] as int?,
+        gameCount: 1,
+        temperature: temperature,
+      );
+
+      if (games.isNotEmpty) {
+        return games.first;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting random game: $e');
+      return null;
+    }
+  }
+
   // Function to get games based on filters
   Future<List<Game>> getGames({
     String? category,
     int? minPlayers,
     int? maxPlayers,
     int? maxTimeMinutes,
+    int gameCount = 5,
+    double temperature = 0.2,
   }) async {
     try {
       // Get API key from secure storage
@@ -200,6 +318,7 @@ class GeminiApiService {
         minPlayers: minPlayers,
         maxPlayers: maxPlayers,
         maxTimeMinutes: maxTimeMinutes,
+        gameCount: gameCount,
       );
 
       // Store the prompt for later reference
@@ -215,7 +334,7 @@ class GeminiApiService {
           },
         ],
         "generationConfig": {
-          "temperature": 0.2,
+          "temperature": temperature,
           "topK": 40,
           "topP": 0.95,
           "maxOutputTokens": 8192,
@@ -301,55 +420,6 @@ class GeminiApiService {
       debugPrint('Exception in getGames: $e');
       return [];
     }
-  }
-
-  // Build prompt with specific instructions for Gemini
-  String _buildPrompt({String? category, int? minPlayers, int? maxPlayers, int? maxTimeMinutes}) {
-    String basePrompt = '''
-    Generate a list of activity games in JSON format. 
-    Each game should include id, name, description, category, imageUrl, minPlayers, maxPlayers, estimatedTimeMinutes, 
-    instructions (as array of strings), isFeatured, difficultyLevel, materialsRequired (as array of strings), 
-    gameType, rating, isTimeBound, teamBased, rules (as array of strings), and howToPlay.
-    
-    Return the response as a valid JSON array only, without any additional text, explanation, or markdown formatting.
-    Do not include any text before or after the JSON array.
-    ''';
-
-    // Add filters to the prompt
-    List<String> filters = [];
-
-    if (category != null) {
-      filters.add('The category must be "$category".');
-    }
-
-    if (minPlayers != null) {
-      filters.add(
-        'The games must support at least $minPlayers players (minPlayers ≥ $minPlayers).',
-      );
-    }
-
-    if (maxPlayers != null) {
-      filters.add(
-        'The games must not require more than $maxPlayers players (maxPlayers ≤ $maxPlayers).',
-      );
-    }
-
-    if (maxTimeMinutes != null) {
-      filters.add(
-        'The games must not take longer than $maxTimeMinutes minutes (estimatedTimeMinutes ≤ $maxTimeMinutes).',
-      );
-    }
-
-    if (filters.isNotEmpty) {
-      basePrompt += '\n\nAdditional requirements:\n';
-      for (var filter in filters) {
-        basePrompt += '- $filter\n';
-      }
-    }
-
-    basePrompt += '\n\nProvide exactly 5 games in the response.';
-
-    return basePrompt;
   }
 
   // Get a specific game by ID

@@ -409,7 +409,7 @@ class HomeScreen extends GetView<HomeController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Featured game title with refresh button
+        // Featured game title with info text
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -432,29 +432,20 @@ class HomeScreen extends GetView<HomeController> {
                 ),
               ),
             ),
-            // Obx(
-            //   () =>
-            //       controller.featuredServiceAvailable.value
-            //           ? Padding(
-            //             padding: const EdgeInsets.only(top: 4.0),
-            //             child: Row(
-            //               mainAxisSize: MainAxisSize.min,
-            //               children: [
-            //                 Flexible(
-            //                   child: Text(
-            //                     'Auto-updates every 10 min',
-            //                     style: textTheme.bodySmall?.copyWith(
-            //                       fontStyle: FontStyle.italic,
-            //                       color: isDarkMode ? Colors.white54 : Colors.black45,
-            //                     ),
-            //                     overflow: TextOverflow.ellipsis,
-            //                   ),
-            //                 ),
-            //               ],
-            //             ),
-            //           )
-            //           : const SizedBox.shrink(),
-            // ),
+            Obx(
+              () =>
+                  controller.featuredServiceAvailable.value
+                      ? Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Text removed - now displayed on the featured game card
+                          ],
+                        ),
+                      )
+                      : const SizedBox.shrink(),
+            ),
           ],
         ),
         const SizedBox(height: AppTheme.mediumPadding),

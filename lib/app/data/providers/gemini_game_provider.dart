@@ -12,6 +12,9 @@ class GeminiGameProvider extends GetxService {
   // Local cache to avoid multiple API calls for the same search
   final Map<String, List<Game>> _cachedGames = {};
 
+  // Track previously returned random games to avoid repetition
+  final List<String> _previouslyReturnedGameIds = [];
+
   // Initialize the Hive box
   Future<GeminiGameProvider> init() async {
     if (!Hive.isBoxOpen(_boxName)) {
@@ -20,6 +23,11 @@ class GeminiGameProvider extends GetxService {
       _gamesBox = Hive.box<Game>(_boxName);
     }
     return this;
+  }
+
+  // Get a random game directly from Gemini API
+  Future<Game?> getRandomGame() async {
+    return await _geminiApiService.getRandomGame();
   }
 
   // Get all games from Gemini

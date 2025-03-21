@@ -14,16 +14,20 @@ class FeaturedGameService {
   final String apiUrl =
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-  // Cache key for storing the featured game
+  // Cache keys
   static const String _cacheKey = 'featured_game_cache';
   static const String _lastFetchTimeKey = 'featured_game_last_fetch';
+  static const String _queueKey = 'games_queue_cache';
 
-  // Cache duration: 10 minutes in milliseconds (changed from 4 hours)
-  static const int _cacheDuration = 10 * 60 * 1000;
+  // Cache duration: 5 minutes in milliseconds for testing
+  static const int _cacheDuration = 5 * 60 * 1000;
 
   // Timer to track when a featured game should be refreshed
   Timer? _refreshTimer;
   final RxBool isRefreshing = false.obs;
+
+  // Keep track of recently generated games to avoid duplicates
+  final List<String> _recentGameIds = [];
 
   // Getter for the refresh timer
   Timer? get refreshTimer => _refreshTimer;
@@ -49,6 +53,12 @@ class FeaturedGameService {
 
       if (game != null) {
         debugPrint('✅ Successfully fetched game from API: ${game.name}');
+        // Track this game's ID to avoid duplicates
+        _recentGameIds.add(game.id);
+        if (_recentGameIds.length > 10) {
+          _recentGameIds.removeAt(0); // Keep the list at a reasonable size
+        }
+
         // Cache the new game
         await _cacheFeaturedGame(game);
         _scheduleNextRefresh();
@@ -60,6 +70,21 @@ class FeaturedGameService {
     } catch (e) {
       debugPrint('❌ Error in getFeaturedGameOfTheDay: $e');
       isRefreshing.value = false;
+      return null;
+    }
+  }
+
+  // Get cached game without triggering a refresh or API call
+  Future<Game?> getCachedGameWithoutRefresh() async {
+    try {
+      final cachedGame = await _getCachedFeaturedGame();
+      if (cachedGame != null) {
+        debugPrint('✅ Retrieved cached game without refresh: ${cachedGame.name}');
+        return cachedGame;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error getting cached game: $e');
       return null;
     }
   }
@@ -114,8 +139,81 @@ class FeaturedGameService {
     }
   }
 
+  // Refresh the featured game (for rotation)
+  Future<Game?> refreshFeaturedGame() async {
+    try {
+      isRefreshing.value = true;
+      debugPrint('🔄 Refreshing featured game for rotation');
+
+      // Load existing queue to check for duplicates
+      final existingGames = await loadGamesQueue();
+      final existingIds = existingGames.map((game) => game.id).toList();
+
+      // Include request for diversity and exclude existing games
+      final game = await _fetchFeaturedGameFromApi(
+        requestDiversity: true,
+        existingGameIds: existingIds,
+      );
+      isRefreshing.value = false;
+
+      if (game != null) {
+        debugPrint('✅ Successfully refreshed featured game: ${game.name}');
+
+        // Add to recent game IDs to avoid duplicates
+        _recentGameIds.add(game.id);
+        if (_recentGameIds.length > 10) {
+          _recentGameIds.removeAt(0);
+        }
+
+        return game;
+      } else {
+        debugPrint('❌ Failed to refresh featured game');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ Error refreshing featured game: $e');
+      isRefreshing.value = false;
+      return null;
+    }
+  }
+
+  // Load games queue from storage
+  Future<List<Game>> loadGamesQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final queueJson = prefs.getString(_queueKey);
+
+      if (queueJson != null) {
+        final List<dynamic> decodedList = jsonDecode(queueJson);
+        final gamesList = decodedList.map((gameJson) => Game.fromJson(gameJson)).toList();
+        debugPrint('✅ Loaded ${gamesList.length} games from queue cache');
+        return gamesList;
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading games queue: $e');
+    }
+    return [];
+  }
+
+  // Save games queue to storage
+  Future<void> saveGamesQueue(List<Game> games) async {
+    try {
+      if (games.isEmpty) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final queueJson = jsonEncode(games.map((game) => game.toJson()).toList());
+      await prefs.setString(_queueKey, queueJson);
+      debugPrint('✅ Saved ${games.length} games to queue cache');
+    } catch (e) {
+      debugPrint('❌ Error saving games queue: $e');
+    }
+  }
+
   // Fetch a featured game from the Gemini API
-  Future<Game?> _fetchFeaturedGameFromApi() async {
+  Future<Game?> _fetchFeaturedGameFromApi({
+    bool requestDiversity = false,
+    List<String>? existingGameIds,
+  }) async {
     try {
       // Get API key from secure storage
       final apiKey = await ApiConfig.getGeminiApiKey();
@@ -128,7 +226,10 @@ class FeaturedGameService {
 
       debugPrint('🔄 Building prompt for featured game');
       // Build prompt for a featured game
-      String prompt = _buildFeaturedGamePrompt();
+      String prompt = _buildFeaturedGamePrompt(
+        requestDiversity: requestDiversity,
+        existingGameIds: existingGameIds,
+      );
 
       // Print the complete prompt for debugging
       debugPrint('===== PROMPT TO GEMINI =====');
@@ -253,20 +354,56 @@ class FeaturedGameService {
     }
   }
 
-  // Build a prompt specifically for a featured game
-  String _buildFeaturedGamePrompt() {
-    return '''
-    Generate a list of activity games in JSON format.
-    Each game should include id, name, description, category, imageUrl, minPlayers, maxPlayers, estimatedTimeMinutes,
-    instructions (as array of strings), isFeatured, difficultyLevel, materialsRequired (as array of strings),
-    gameType, rating, isTimeBound, teamBased, rules (as array of strings), and howToPlay.
+  // Build the prompt for the featured game
+  String _buildFeaturedGamePrompt({bool requestDiversity = false, List<String>? existingGameIds}) {
+    String basePrompt = '''
+    You are a creative game designer. Create a detailed description of an engaging team-building or icebreaker game activity that would be fun for a group.
 
-    Return the response as a valid JSON array only, without any additional text, explanation, or markdown formatting.
-    Do not include any text before or after the JSON array.
+    Return ONLY a JSON object with the following structure (without any explanation before or after):
+    {
+      "id": "generate a random alphanumeric id",
+      "name": "Game name",
+      "description": "A detailed description of the game",
+      "category": "One of: Team-Building, Icebreakers, Brain Games, Quick Games",
+      "imageUrl": "leave empty or provide a placeholder image path",
+      "minPlayers": minimum players required (number),
+      "maxPlayers": maximum players allowed (number),
+      "estimatedTimeMinutes": estimated time to play in minutes (number),
+      "instructions": ["Step 1", "Step 2", ...],
+      "isFeatured": true,
+      "difficultyLevel": "One of: Easy, Medium, Hard",
+      "materialsRequired": ["item1", "item2", ...],
+      "gameType": "One of: Indoor, Outdoor, Desk-based, Challenge",
+      "rating": a number between 3.0 and 5.0,
+      "isTimeBound": boolean indicating if game has time limit,
+      "teamBased": boolean indicating if game requires teams,
+      "rules": ["Rule 1", "Rule 2", ...],
+      "howToPlay": "Brief explanation of gameplay"
+    }
+    
+    Focus on creating activities that are engaging, easy to explain, and help with team bonding.
+    ''';
 
+    // If requesting diversity, add some specific instructions
+    if (requestDiversity) {
+      basePrompt += '''
+      
+      IMPORTANT: Create a game that is DIFFERENT from these recent games:
+      ${_recentGameIds.isNotEmpty ? 'Recent IDs: ${_recentGameIds.join(', ')}' : 'No recent games yet'}
+      ${existingGameIds != null && existingGameIds.isNotEmpty ? 'Existing IDs: ${existingGameIds.join(', ')}' : ''}
+      
+      Make sure to create a game with a DIFFERENT:
+      - Game type (if previous was indoor, try outdoor)
+      - Difficulty level (vary between easy, medium, hard)
+      - Player count (some for small groups, some for larger groups)
+      - Materials required (some should need few materials, others more)
+      - Category (mix between Team-Building, Icebreakers, Brain Games, Quick Games)
+      
+      Ensure the game has a unique name, concept, and ID from any previously mentioned games.
+      ''';
+    }
 
-Provide exactly 5 games in the response.
-''';
+    return basePrompt;
   }
 
   // Schedule the next refresh based on when the cache will expire
@@ -298,41 +435,6 @@ Provide exactly 5 games in the response.
       }
     } catch (e) {
       debugPrint('❌ Error scheduling next refresh: $e');
-    }
-  }
-
-  // Force refresh the featured game cache
-  Future<Game?> refreshFeaturedGame() async {
-    if (isRefreshing.value) {
-      debugPrint('⚠️ Already refreshing, ignoring duplicate request');
-      return null;
-    }
-
-    try {
-      isRefreshing.value = true;
-      debugPrint('🔄 Starting cache clearance in FeaturedGameService.refreshFeaturedGame()');
-      // Clear the current cache
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey);
-      await prefs.remove(_lastFetchTimeKey);
-      debugPrint('✅ Cache cleared successfully');
-
-      // Fetch a new game
-      debugPrint('🔄 Fetching new featured game after cache clearance');
-      final game = await getFeaturedGameOfTheDay();
-
-      if (game != null) {
-        debugPrint('✅ Successfully fetched new featured game: ${game.name}');
-      } else {
-        debugPrint('❌ Failed to fetch new featured game after cache clearance');
-      }
-
-      return game;
-    } catch (e) {
-      debugPrint('❌ Error in FeaturedGameService.refreshFeaturedGame(): $e');
-      return null;
-    } finally {
-      isRefreshing.value = false;
     }
   }
 }
