@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Creative lightbulb with ideas -->
+  <g>
+    <!-- Main lightbulb shape -->
+    <path d="M256 64C186.7 64 130 120.7 130 190C130 234.7 154.7 271.3 188 288.7V328C188 336.8 195.2 344 204 344H308C316.8 344 324 336.8 324 328V288.7C357.3 271.3 382 234.7 382 190C382 120.7 325.3 64 256 64Z" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    
+    <!-- Base of bulb -->
+    <path d="M208 376H304" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M208 408H304" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M240 440H272" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Shine lines -->
+    <path d="M256 24V48" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M416 190H440" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M72 190H96" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M352 94L370 76" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M142 304L124 322" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M160 94L142 76" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M370 304L388 322" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Idea sparks inside bulb -->
+    <path d="M236 170C236 170 246 140 275 150C304 160 286 190 286 190" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="236" cy="220" r="8" fill="currentColor"/>
+    <circle cx="286" cy="220" r="8" fill="currentColor"/>
+    <path d="M246 246C246 246 256 266 266 246" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg> 
