@@ -16,10 +16,6 @@ class LeaderboardProvider extends GetxService {
       _leaderboardBox = Hive.box<LeaderboardEntry>(_boxName);
     }
 
-    // Clear any existing data once on app startup
-    // This is temporary to remove any dummy/sample data
-    await _leaderboardBox.clear();
-
     return this;
   }
 
@@ -36,7 +32,11 @@ class LeaderboardProvider extends GetxService {
   // Get entries for a specific player or team
   List<LeaderboardEntry> getEntriesByPlayerOrTeam(String playerOrTeamName) {
     return _leaderboardBox.values
-        .where((entry) => entry.playerOrTeamName == playerOrTeamName)
+        .where(
+          (entry) =>
+              entry.playerOrTeamName == playerOrTeamName ||
+              (entry.playerNames != null && entry.playerNames!.contains(playerOrTeamName)),
+        )
         .toList();
   }
 
@@ -75,6 +75,7 @@ class LeaderboardProvider extends GetxService {
     required String gameId,
     required String gameName,
     required int score,
+    List<String>? playerNames,
   }) async {
     final entry = LeaderboardEntry(
       id: randomAlphaNumeric(10),
@@ -83,6 +84,7 @@ class LeaderboardProvider extends GetxService {
       gameName: gameName,
       score: score,
       datePlayed: DateTime.now(),
+      playerNames: playerNames,
     );
 
     await addEntry(entry);

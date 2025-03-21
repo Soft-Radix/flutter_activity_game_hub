@@ -22,6 +22,9 @@ class LeaderboardEntry {
   @HiveField(5)
   final DateTime datePlayed;
 
+  @HiveField(6)
+  final List<String>? playerNames;
+
   LeaderboardEntry({
     required this.id,
     required this.playerOrTeamName,
@@ -29,6 +32,7 @@ class LeaderboardEntry {
     required this.gameName,
     required this.score,
     required this.datePlayed,
+    this.playerNames,
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
@@ -39,6 +43,7 @@ class LeaderboardEntry {
       gameName: json['gameName'] as String,
       score: json['score'] as int,
       datePlayed: DateTime.parse(json['datePlayed'] as String),
+      playerNames: json['playerNames'] != null ? List<String>.from(json['playerNames']) : null,
     );
   }
 
@@ -50,6 +55,17 @@ class LeaderboardEntry {
       'gameName': gameName,
       'score': score,
       'datePlayed': datePlayed.toIso8601String(),
+      'playerNames': playerNames,
     };
+  }
+
+  // Helper method to get player names list (handles backward compatibility)
+  List<String> getPlayerNamesList() {
+    if (playerNames != null && playerNames!.isNotEmpty) {
+      return playerNames!;
+    } else {
+      // If playerNames is not available, use the playerOrTeamName as fallback
+      return [playerOrTeamName];
+    }
   }
 }

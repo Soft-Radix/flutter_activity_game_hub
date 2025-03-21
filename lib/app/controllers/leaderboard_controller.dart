@@ -115,15 +115,26 @@ class LeaderboardController extends GetxController {
   // Get players with most games played (unique games count)
   List<Map<String, Object>> getPlayersWithMostGames({int limit = 10}) {
     final Map<String, Set<String>> playerGames = {};
+    final Map<String, String> playerMostRecentGame = {};
+    final Map<String, DateTime> playerMostRecentDate = {};
 
-    // Track unique games played by each player
+    // Track unique games played by each player and their most recent game
     for (final entry in filteredEntries) {
+      // Track unique games
       if (!playerGames.containsKey(entry.playerOrTeamName)) {
         playerGames[entry.playerOrTeamName] = <String>{};
+        playerMostRecentDate[entry.playerOrTeamName] = DateTime(1970); // initialize with old date
       }
 
       // Add this game to the player's set of games
       playerGames[entry.playerOrTeamName]!.add(entry.gameId);
+
+      // Track most recent game for each player
+      if (!playerMostRecentDate.containsKey(entry.playerOrTeamName) ||
+          entry.datePlayed.isAfter(playerMostRecentDate[entry.playerOrTeamName]!)) {
+        playerMostRecentDate[entry.playerOrTeamName] = entry.datePlayed;
+        playerMostRecentGame[entry.playerOrTeamName] = entry.gameName;
+      }
     }
 
     // Convert to list and sort by number of unique games played
@@ -134,6 +145,7 @@ class LeaderboardController extends GetxController {
                 'name': e.key as Object,
                 'gamesCount': e.value.length as Object,
                 'gameIds': e.value.toList() as Object,
+                'gameName': playerMostRecentGame[e.key] ?? 'Unknown Game' as Object,
               },
             )
             .toList();
@@ -179,6 +191,7 @@ class LeaderboardController extends GetxController {
     required String gameId,
     required String gameName,
     required int score,
+    List<String>? playerNames,
   }) async {
     try {
       await _leaderboardProvider.createEntry(
@@ -186,6 +199,7 @@ class LeaderboardController extends GetxController {
         gameId: gameId,
         gameName: gameName,
         score: score,
+        playerNames: playerNames,
       );
 
       // Refresh leaderboard
@@ -233,5 +247,62 @@ class LeaderboardController extends GetxController {
     personalBests.sort((a, b) => b.score.compareTo(a.score));
 
     return personalBests;
+  }
+
+  // Get all entries for a specific user/team
+  List<LeaderboardEntry> getAllUserEntries(String playerOrTeamName) {
+    // Get all entries for this player/team from the provider
+    final entries = _leaderboardProvider.getEntriesByPlayerOrTeam(playerOrTeamName);
+
+    // Sort by date, most recent first
+    entries.sort((a, b) => b.datePlayed.compareTo(a.datePlayed));
+
+    return entries;
+  }
+
+  // Get all players who played a specific game
+  List<Map<String, dynamic>> getPlayersForGame(String gameId) {
+    // Get all entries for this game
+    final gameEntries = _leaderboardProvider.getEntriesByGameId(gameId);
+    final result = <Map<String, dynamic>>[];
+
+    // Debug
+    debugPrint('Getting players for game with ID: $gameId');
+    debugPrint('Found ${gameEntries.length} entries for this game');
+
+    if (gameEntries.isEmpty) {
+      debugPrint('No entries found for this game');
+      return [];
+    }
+
+    // Process each entry
+    for (final entry in gameEntries) {
+      debugPrint(
+        'Processing entry: ${entry.id}, Players: ${entry.playerNames}, Team: ${entry.playerOrTeamName}',
+      );
+
+      if (entry.playerNames != null && entry.playerNames!.isNotEmpty) {
+        // If entry has player names array, add each player
+        for (final playerName in entry.playerNames!) {
+          result.add({
+            'name': playerName,
+            'score': entry.score,
+            'datePlayed': entry.datePlayed,
+            'id': entry.id,
+          });
+        }
+      } else {
+        // Fall back to the old format if entry doesn't have playerNames
+        result.add({
+          'name': entry.playerOrTeamName,
+          'score': entry.score,
+          'datePlayed': entry.datePlayed,
+          'id': entry.id,
+        });
+      }
+    }
+
+    debugPrint('Returned ${result.length} players for this game');
+    return result;
   }
 }

@@ -133,6 +133,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Future<void> _searchGamesWithGemini() async {
     debugPrint('===== SEARCHING WITH GEMINI =====');
     debugPrint('Search method called with query: "${_searchController.text}"');
+    debugPrint(
+      'Current filter values - Min Players: ${_minPlayers.value}, Max Time: ${_maxTime.value}',
+    );
 
     if (_searchController.text.isEmpty) {
       Get.snackbar(
@@ -162,13 +165,23 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
       // Try direct API call first with filter parameters
       debugPrint('===== MAKING DIRECT API CALL WITH FILTERS =====');
+      debugPrint(
+        'Filters being applied - Min Players: ${_minPlayers.value}, Max Time: ${_maxTime.value}',
+      );
+
+      // Ensure minPlayers is at least 1 to avoid API issues
+      final effectiveMinPlayers = _minPlayers.value > 0 ? _minPlayers.value : 15;
+
       final directApiGames = await geminiApiService.getGames(
         category: searchQuery,
-        minPlayers: _minPlayers.value, // Pass the filter value directly
-        maxPlayers: _minPlayers.value, // Use min players for max to ensure compatibility
+        minPlayers: effectiveMinPlayers, // Pass the filter value directly
+        maxPlayers: effectiveMinPlayers, // Use min players for max to ensure compatibility
         maxTimeMinutes: _maxTime.value, // Pass the filter value directly
       );
       debugPrint('Direct API call returned ${directApiGames.length} games');
+      debugPrint(
+        'Games returned with min players: ${directApiGames.map((g) => "${g.name} (min: ${g.minPlayers}, max: ${g.maxPlayers}, time: ${g.estimatedTimeMinutes})").join(", ")}',
+      );
 
       // Now call the Gemini API with the search query through the controller with filters
       // First set the filters in the controller
@@ -184,18 +197,26 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
       // Set the filters in the controller
       _geminiController.selectedCategory.value = tempCategory;
-      _geminiController.selectedPlayerCount.value = _minPlayers.value;
+      _geminiController.selectedPlayerCount.value = effectiveMinPlayers;
       _geminiController.selectedMaxTime.value = _maxTime.value;
 
       // Now make the call with the controller
       debugPrint('===== MAKING CONTROLLER API CALL WITH FILTERS =====');
+      debugPrint(
+        'Controller filter values - Category: ${_geminiController.selectedCategory.value?.name}, Players: ${_geminiController.selectedPlayerCount.value}, Max Time: ${_geminiController.selectedMaxTime.value}',
+      );
+
       await _geminiController.getGamesWithFilters();
       debugPrint('Controller API call completed');
+      debugPrint('Controller returned ${_geminiController.games.length} games');
+      debugPrint(
+        'Games returned from controller: ${_geminiController.games.map((g) => "${g.name} (min: ${g.minPlayers}, max: ${g.maxPlayers}, time: ${g.estimatedTimeMinutes})").join(", ")}',
+      );
 
       // Print API details to console
       debugPrint('===== SEARCH QUERY =====');
       debugPrint('Query: $searchQuery');
-      debugPrint('Filters: Min Players: ${_minPlayers.value}, Max Time: ${_maxTime.value}');
+      debugPrint('Filters: Min Players: $effectiveMinPlayers, Max Time: ${_maxTime.value}');
       debugPrint('===== END SEARCH QUERY =====');
 
       // Display a snackbar to show that API details are available
@@ -216,13 +237,53 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       _filteredGames.value =
           _geminiController.games.isEmpty ? directApiGames : _geminiController.games;
 
+      // Double-check that games meet our filter criteria
+      debugPrint('===== VERIFYING FILTERED GAMES =====');
+      final matchFilter =
+          _filteredGames.where((game) {
+            final hasEnoughPlayers =
+                game.minPlayers <= effectiveMinPlayers && game.maxPlayers >= effectiveMinPlayers;
+            final withinTimeLimit = game.estimatedTimeMinutes <= _maxTime.value;
+            final meetsCriteria = hasEnoughPlayers && withinTimeLimit;
+
+            if (!meetsCriteria) {
+              debugPrint(
+                '⚠️ Game does not meet filter criteria: ${game.name} (min: ${game.minPlayers}, max: ${game.maxPlayers}, time: ${game.estimatedTimeMinutes})',
+              );
+            }
+
+            return meetsCriteria;
+          }).toList();
+
+      debugPrint(
+        '${matchFilter.length} out of ${_filteredGames.length} games meet filter criteria',
+      );
+
+      // If some games don't meet criteria, replace with only those that do
+      if (matchFilter.length < _filteredGames.length && matchFilter.isNotEmpty) {
+        debugPrint(
+          '⚠️ Some games do not meet filter criteria! Filtering locally to ensure accuracy.',
+        );
+        _filteredGames.value = matchFilter;
+      }
+
       // Display results count for diagnosis
-      debugPrint('Filtered games count: ${_filteredGames.length}');
+      debugPrint('Final filtered games count: ${_filteredGames.length}');
 
       if (_filteredGames.isEmpty && directApiGames.isNotEmpty) {
         // If direct API call has games but controller failed
         debugPrint('Using direct API results as fallback');
-        _filteredGames.value = directApiGames;
+
+        // Filter direct API games to ensure they meet criteria
+        final filteredDirectGames =
+            directApiGames.where((game) {
+              final hasEnoughPlayers =
+                  game.minPlayers <= effectiveMinPlayers && game.maxPlayers >= effectiveMinPlayers;
+              final withinTimeLimit = game.estimatedTimeMinutes <= _maxTime.value;
+              return hasEnoughPlayers && withinTimeLimit;
+            }).toList();
+
+        _filteredGames.value = filteredDirectGames;
 
         Get.snackbar(
           'Controller Issue',
@@ -241,7 +302,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       } else {
         Get.snackbar(
           'Search Complete',
-          'Found ${_filteredGames.length} games matching "${_searchController.text}"',
+          'Found ${_filteredGames.length} games matching "${_searchController.text}" for $effectiveMinPlayers players and up to ${_maxTime.value} minutes',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green,
           colorText: Colors.white,

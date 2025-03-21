@@ -297,24 +297,49 @@ class GamePlayController extends GetxController {
     if (game.value == null) return;
 
     try {
-      final String playerName = players.isNotEmpty ? players.first : this.playerName.value;
+      // Use a team name approach for playerOrTeamName if multiple players
+      final String playerOrTeamName =
+          players.length > 1
+              ? "${players.first} + ${players.length - 1} more"
+              : (players.isNotEmpty ? players.first : playerName.value);
+
+      // Get the complete list of players for the playerNames array
+      final List<String> participatingPlayers =
+          players.isNotEmpty ? List<String>.from(players) : [playerName.value];
+
+      // Ensure we're saving unique player names (no duplicates)
+      final List<String> uniquePlayers = participatingPlayers.toSet().toList();
 
       await _leaderboardController.addEntry(
-        playerOrTeamName: playerName,
+        playerOrTeamName: playerOrTeamName,
         gameId: game.value!.id,
         gameName: game.value!.name,
         score: gameScore.value,
+        playerNames: uniquePlayers,
+      );
+
+      // Provide feedback with more detailed information
+      Get.snackbar(
+        'Game Saved Successfully',
+        'Game "${game.value!.name}" completed with ${uniquePlayers.length} players',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.shade700,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(8),
+        borderRadius: 10,
+        duration: const Duration(seconds: 3),
       );
 
       debugPrint(
-        'Game history saved successfully for player: $playerName, game: ${game.value!.name}, score: ${gameScore.value}',
+        'Game history saved successfully for team: $playerOrTeamName, game: ${game.value!.name}, '
+        'score: ${gameScore.value}, all players: ${uniquePlayers.join(", ")}',
       );
     } catch (e) {
       debugPrint('Error saving game history: $e');
-      // Show error to user
+      // Show detailed error to user
       Get.snackbar(
         'Error Saving Game',
-        'There was a problem saving your game to history. Please try again.',
+        'Could not save to history: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red.shade700,
         colorText: Colors.white,
