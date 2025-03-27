@@ -466,7 +466,6 @@ class GeminiApiService {
       debugPrint('===== PROMPT TO GEMINI =====');
       debugPrint(prompt);
       debugPrint('===== END PROMPT =====');
-
       // Print raw response to console
       debugPrint('===== RAW API RESPONSE =====');
       debugPrint(lastRawResponse);
@@ -710,7 +709,7 @@ Remember to ONLY return the JSON array, nothing else.
 
         // Get an appropriate image URL from Unsplash via Gemini
         final unsplashUrl = await getUnsplashImageUrl(searchQuery);
-
+        
         // Create a new game with the updated imageUrl
         final updatedGame = Game(
           id: game.id,
