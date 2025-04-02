@@ -203,13 +203,13 @@ class SettingsScreen extends StatelessWidget {
                         icon: Icons.notifications_outlined,
                         subtitle: 'Manage notification preferences',
                         onTap: () {
-                          Get.snackbar(
-                            'Notifications',
-                            'Notification settings would be implemented here',
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
-                            colorText: isDarkMode ? Colors.white : Colors.black87,
-                          );
+                          // Get.snackbar(
+                          //   'Notifications',
+                          //   'Notification settings would be implemented here',
+                          //   snackPosition: SnackPosition.BOTTOM,
+                          //   backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
+                          //   colorText: isDarkMode ? Colors.white : Colors.black87,
+                          // );
                         },
                         isDarkMode: isDarkMode,
                       ),
@@ -229,13 +229,13 @@ class SettingsScreen extends StatelessWidget {
                         icon: Icons.storage_outlined,
                         subtitle: 'Manage app data and storage settings',
                         onTap: () {
-                          Get.snackbar(
-                            'Data & Storage',
-                            'Data and storage settings would be implemented here',
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
-                            colorText: isDarkMode ? Colors.white : Colors.black87,
-                          );
+                          // Get.snackbar(
+                          //   'Data & Storage',
+                          //   'Data and storage settings would be implemented here',
+                          //   snackPosition: SnackPosition.BOTTOM,
+                          //   backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
+                          //   colorText: isDarkMode ? Colors.white : Colors.black87,
+                          // );
                         },
                         isDarkMode: isDarkMode,
                       ),
@@ -265,13 +265,13 @@ class SettingsScreen extends StatelessWidget {
                         icon: Icons.info_outline,
                         subtitle: 'Version 1.0.0',
                         onTap: () {
-                          Get.snackbar(
-                            'App Info',
-                            'Activity Game Hub v1.0.0',
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
-                            colorText: isDarkMode ? Colors.white : Colors.black87,
-                          );
+                          // Get.snackbar(
+                          //   'App Info',
+                          //   'Activity Game Hub v1.0.0',
+                          //   snackPosition: SnackPosition.BOTTOM,
+                          //   backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
+                          //   colorText: isDarkMode ? Colors.white : Colors.black87,
+                          // );
                         },
                         isDarkMode: isDarkMode,
                       ),
@@ -291,13 +291,13 @@ class SettingsScreen extends StatelessWidget {
                         icon: Icons.help_outline,
                         subtitle: 'Get help or contact support',
                         onTap: () {
-                          Get.snackbar(
-                            'Help & Support',
-                            'Help and support options would be shown here',
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
-                            colorText: isDarkMode ? Colors.white : Colors.black87,
-                          );
+                          // Get.snackbar(
+                          //   'Help & Support',
+                          //   'Help and support options would be shown here',
+                          //   snackPosition: SnackPosition.BOTTOM,
+                          //   backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
+                          //   colorText: isDarkMode ? Colors.white : Colors.black87,
+                          // );
                         },
                         isDarkMode: isDarkMode,
                       ),
@@ -317,13 +317,13 @@ class SettingsScreen extends StatelessWidget {
                         icon: Icons.privacy_tip_outlined,
                         subtitle: 'View our privacy policy',
                         onTap: () {
-                          Get.snackbar(
-                            'Privacy Policy',
-                            'Privacy policy would be shown here',
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
-                            colorText: isDarkMode ? Colors.white : Colors.black87,
-                          );
+                          // Get.snackbar(
+                          //   'Privacy Policy',
+                          //   'Privacy policy would be shown here',
+                          //   snackPosition: SnackPosition.BOTTOM,
+                          //   backgroundColor: isDarkMode ? const Color(0xFF2D3142) : Colors.white,
+                          //   colorText: isDarkMode ? Colors.white : Colors.black87,
+                          // );
                         },
                         isDarkMode: isDarkMode,
                       ),
@@ -390,6 +390,7 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildApiSettings(bool isDarkMode) {
     final TextEditingController apiKeyController = TextEditingController();
+    apiKeyController.text = 'AIzaSyDKtcNdQ2jaUv8X2IcF7AU7Yvi_st-k2EA';
 
     // Load the saved API key if available
     ApiConfig.getGeminiApiKey().then((value) {

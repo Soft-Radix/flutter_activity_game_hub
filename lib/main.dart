@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app/bindings/app_binding.dart';
 import 'app/controllers/bindings/main_binding.dart';
+import 'app/controllers/theme_controller.dart';
 import 'app/data/models/game_model.dart';
 import 'app/data/models/leaderboard_entry_model.dart';
 import 'app/data/providers/game_provider.dart';
@@ -66,17 +67,22 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: 'Activity Game Hub',
-      theme: AppTheme.getLightTheme(),
-      darkTheme: AppTheme.getDarkTheme(),
-      themeMode: ThemeMode.system,
-      initialRoute: AppPages.INITIAL,
-      getPages: AppPages.routes,
-      debugShowCheckedModeBanner: false,
-      defaultTransition: Transition.cupertino,
-      transitionDuration: AppTheme.mediumAnimationDuration,
-      initialBinding: MainBinding(),
+    return GetBuilder<ThemeController>(
+      init: ThemeController(),
+      builder: (themeController) {
+        return GetMaterialApp(
+          title: 'Activity Game Hub',
+          theme: AppTheme.getLightTheme(),
+          darkTheme: AppTheme.getDarkTheme(),
+          themeMode: themeController.themeMode.value,
+          initialRoute: AppPages.INITIAL,
+          getPages: AppPages.routes,
+          debugShowCheckedModeBanner: false,
+          defaultTransition: Transition.cupertino,
+          transitionDuration: AppTheme.mediumAnimationDuration,
+          initialBinding: MainBinding(),
+        );
+      },
     );
   }
 }

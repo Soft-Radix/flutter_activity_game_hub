@@ -299,13 +299,13 @@ class HomeScreen extends GetView<HomeController> {
         crossAxisCount: 2,
         crossAxisSpacing: AppTheme.padding,
         mainAxisSpacing: AppTheme.padding,
-        childAspectRatio: 1.2,
       ),
       itemCount: categories.length,
       itemBuilder: (context, index) {
         final categoryData = categories[index];
 
         return Card(
+          
           clipBehavior: Clip.antiAlias,
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -314,7 +314,8 @@ class HomeScreen extends GetView<HomeController> {
               // Pass title to Categories screen
               Get.toNamed(AppRoutes.CATEGORIES, arguments: {'title': categoryData['name']});
             },
-            child: Container(
+            child:  Container(
+              
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -382,8 +383,6 @@ class HomeScreen extends GetView<HomeController> {
                                   ),
                                 ],
                               ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 2,
                             ),
                           ),
                         ],

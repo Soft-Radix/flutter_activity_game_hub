@@ -285,28 +285,28 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
         _filteredGames.value = filteredDirectGames;
 
-        Get.snackbar(
-          'Controller Issue',
-          'Using direct API results instead. This indicates a potential controller issue.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
+        // Get.snackbar(
+        //   'Controller Issue',
+        //   'Using direct API results instead. This indicates a potential controller issue.',
+        //   snackPosition: SnackPosition.BOTTOM,
+        //   backgroundColor: Colors.orange,
+        //   colorText: Colors.white,
+        // );
       } else if (_filteredGames.isEmpty) {
         // If no games at all, show a different message
-        Get.snackbar(
-          'No Results',
-          'No games found for "${_searchController.text}" with your filter settings. Try different search terms or adjust your filters.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+        // Get.snackbar(
+        //   'No Results',
+        //   'No games found for "${_searchController.text}" with your filter settings. Try different search terms or adjust your filters.',
+        //   snackPosition: SnackPosition.BOTTOM,
+        // );
       } else {
-        Get.snackbar(
-          'Search Complete',
-          'Found ${_filteredGames.length} games matching "${_searchController.text}" for $effectiveMinPlayers players and up to ${_maxTime.value} minutes',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
+        // Get.snackbar(
+        //   'Search Complete',
+        //   'Found ${_filteredGames.length} games matching "${_searchController.text}" for $effectiveMinPlayers players and up to ${_maxTime.value} minutes',
+        //   snackPosition: SnackPosition.BOTTOM,
+        //   backgroundColor: Colors.green,
+        //   colorText: Colors.white,
+        // );
       }
     } catch (e) {
       debugPrint('===== ERROR DURING SEARCH =====');

@@ -22,7 +22,7 @@ class CategoryController extends GetxController {
   final RxList<Game> searchResults = <Game>[].obs;
   final RxBool isLoadingMore = false.obs;
   final RxBool hasMoreResults = true.obs;
-  final int pageSize = 10;
+  final int pageSize = 20;
   final RxInt currentPage = 1.obs;
   final RxString lastSearchQuery = "".obs;
 
@@ -48,6 +48,8 @@ class CategoryController extends GetxController {
 
   // Load random games based on category title
   Future<void> loadGamesByTitle(String title, {bool resetPagination = true}) async {
+    debugPrint('Loading games for category: $title with pageSize: $pageSize');
+
     if (resetPagination) {
       isLoadingCategoryGames.value = true;
       categoryCurrentPage.value = 1;
@@ -57,18 +59,25 @@ class CategoryController extends GetxController {
     }
 
     try {
+      // Request more games for the Ice Breakers category specifically
+      final actualPageSize = title.contains('Ice Breaker') ? 15 : pageSize;
+
       final results = await _geminiController.getGamesByCategory(
         title,
-        pageSize: pageSize,
+        pageSize: actualPageSize,
         page: categoryCurrentPage.value,
       );
 
       if (results.isEmpty) {
         hasMoreCategoryGames.value = false;
+        debugPrint('No games found for category: $title');
       } else {
         categoryGames.addAll(results);
         categoryCurrentPage.value++;
-        hasMoreCategoryGames.value = results.length >= pageSize;
+        hasMoreCategoryGames.value = results.length >= actualPageSize;
+        debugPrint(
+          'Loaded ${results.length} games for category: $title. Total: ${categoryGames.length}',
+        );
       }
 
       refreshUI();

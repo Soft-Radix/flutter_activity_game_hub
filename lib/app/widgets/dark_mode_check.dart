@@ -16,18 +16,25 @@ class DarkModeCheck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Use GetX's find with tag to ensure consistent controller instance
     final themeController = Get.find<ThemeController>();
 
-    return Obx(() {
-      final isDarkMode = themeController.isDarkMode;
+    return GetBuilder<ThemeController>(
+      builder: (controller) {
+        final isDarkMode = controller.isDarkMode;
 
-      // Call the optional callback if provided
-      if (onDarkModeChanged != null) {
-        onDarkModeChanged!(isDarkMode);
-      }
+        // Call the optional callback if provided
+        if (onDarkModeChanged != null) {
+          onDarkModeChanged!(isDarkMode);
+        }
 
-      return builder(context, isDarkMode);
-    });
+        debugPrint(
+          '🎨 DarkModeCheck builder with isDarkMode: $isDarkMode, theme mode: ${controller.themeMode.value}',
+        );
+
+        return builder(context, isDarkMode);
+      },
+    );
   }
 }
 

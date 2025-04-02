@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as Math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -149,12 +150,12 @@ class GeminiApiService {
                     OutlinedButton(
                       onPressed: () {
                         // Also show in UI for easier viewing
-                        Get.snackbar(
-                          'API Response Printed',
-                          'Full API response has been printed to the console',
-                          snackPosition: SnackPosition.BOTTOM,
-                          duration: const Duration(seconds: 3),
-                        );
+                        // Get.snackbar(
+                        //   'API Response Printed',
+                        //   'Full API response has been printed to the console',
+                        //   snackPosition: SnackPosition.BOTTOM,
+                        //   duration: const Duration(seconds: 3),
+                        // );
                         Get.back(); // Close dialog
                       },
                       child: Text('Close'),
@@ -178,6 +179,12 @@ class GeminiApiService {
     int gameCount = 5,
     int page = 1,
   }) {
+    // If the category is Ice Breakers, ensure we get at least 5 games
+    final effectiveGameCount =
+        category?.toLowerCase().contains('ice breaker') == true
+            ? Math.max(gameCount, 5)
+            : gameCount;
+
     // Add randomness to ensure different responses each time
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final randomSeed = DateTime.now().microsecondsSinceEpoch % 10000;
@@ -222,6 +229,14 @@ class GeminiApiService {
 
     if (category != null) {
       filters.add('The category must be "$category".');
+
+      // For Ice Breakers, add specific instructions to ensure variety
+      if (category.toLowerCase().contains('ice breaker')) {
+        filters.add(
+          'Ensure a diverse range of ice breaker games that would work well in different settings (office, social events, team building).',
+        );
+        filters.add('Include games with varying levels of interaction and engagement.');
+      }
     }
 
     if (minPlayers != null) {
@@ -249,11 +264,12 @@ class GeminiApiService {
       }
     }
 
-    basePrompt += '\n\nProvide exactly $gameCount games in the response.';
+    // Explicitly request the number of games
+    basePrompt += '\n\nProvide exactly $effectiveGameCount games in the response.\n';
 
-    // Add a request for novelty to avoid repetition
+    // Add emphasis for variety
     basePrompt +=
-        '\n\nIMPORTANT: Make these games different from any previous responses. Create completely unique games not commonly known.';
+        '\nIMPORTANT: Make these games different from any previous responses. Create completely unique games not commonly known.';
 
     return basePrompt;
   }
@@ -367,11 +383,48 @@ class GeminiApiService {
           debugPrint(textValue);
           debugPrint('===== END PARSED JSON =====');
 
-          // Parse the JSON string to get the games list
-          final List<dynamic> gamesJson = json.decode(textValue);
+          // Clean up the JSON string before parsing
+          String cleanedJson = _cleanupJsonString(textValue);
 
-          // Convert JSON to Game objects
-          final List<Game> games = gamesJson.map((game) => Game.fromJson(game)).toList();
+          // Parse the JSON string to get the games list
+          List<dynamic> gamesJson;
+          try {
+            gamesJson = json.decode(cleanedJson);
+          } catch (decodeError) {
+            debugPrint('Error decoding JSON, attempting to fix: $decodeError');
+
+            // Try to extract valid JSON using regex if decoding fails
+            final jsonArrayRegex = RegExp(r'\[.*\]', dotAll: true);
+            final match = jsonArrayRegex.firstMatch(cleanedJson);
+
+            if (match != null) {
+              final extractedJson = match.group(0);
+              debugPrint('Extracted JSON array: $extractedJson');
+              try {
+                gamesJson = json.decode(extractedJson!);
+              } catch (e) {
+                debugPrint('Still failed to parse JSON: $e');
+                return [];
+              }
+            } else {
+              debugPrint('Could not extract valid JSON array');
+              return [];
+            }
+          }
+
+          // Convert JSON to Game objects with error handling for each game
+          final List<Game> games = [];
+          for (var gameJson in gamesJson) {
+            try {
+              if (gameJson is Map<String, dynamic>) {
+                final game = Game.fromJson(gameJson);
+                games.add(game);
+              }
+            } catch (e) {
+              debugPrint('Error parsing individual game: $e');
+              // Continue with next game instead of failing
+            }
+          }
 
           // Process games to get Unsplash images
           final processedGames = await processGamesWithUnsplashImages(games);
@@ -379,6 +432,14 @@ class GeminiApiService {
           return processedGames;
         } catch (e) {
           debugPrint('Error parsing Gemini response: $e');
+          Get.snackbar(
+            'Error',
+            'Failed to parse games data from the server. Please try again.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 3),
+          );
           return [];
         }
       } else {
@@ -483,7 +544,44 @@ class GeminiApiService {
           debugPrint(textValue);
           debugPrint('===== END PARSED JSON =====');
 
-          final Map<String, dynamic> gameJson = json.decode(textValue);
+          // Clean up the JSON string before parsing
+          String cleanedJson = _cleanupJsonString(textValue);
+
+          // Parse the JSON string to get the game details
+          Map<String, dynamic> gameJson;
+          try {
+            final decoded = json.decode(cleanedJson);
+
+            // Handle if the result is a list instead of a map
+            if (decoded is List && decoded.isNotEmpty) {
+              gameJson = decoded.first;
+            } else if (decoded is Map<String, dynamic>) {
+              gameJson = decoded;
+            } else {
+              debugPrint('Unexpected decoded JSON type: ${decoded.runtimeType}');
+              return null;
+            }
+          } catch (decodeError) {
+            debugPrint('Error decoding JSON, attempting to fix: $decodeError');
+
+            // Try to extract valid JSON using regex if decoding fails
+            final jsonObjectRegex = RegExp(r'\{.*\}', dotAll: true);
+            final match = jsonObjectRegex.firstMatch(cleanedJson);
+
+            if (match != null) {
+              final extractedJson = match.group(0);
+              debugPrint('Extracted JSON object: $extractedJson');
+              try {
+                gameJson = json.decode(extractedJson!) as Map<String, dynamic>;
+              } catch (e) {
+                debugPrint('Still failed to parse JSON: $e');
+                return null;
+              }
+            } else {
+              debugPrint('Could not extract valid JSON object');
+              return null;
+            }
+          }
 
           // Create Game object from JSON
           final game = Game.fromJson(gameJson);
@@ -494,6 +592,14 @@ class GeminiApiService {
           return processedGame;
         } catch (e) {
           debugPrint('Error parsing Gemini response for game details: $e');
+          Get.snackbar(
+            'Error',
+            'Failed to get game details. Please try again.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 3),
+          );
           return null;
         }
       } else {
@@ -709,7 +815,7 @@ Remember to ONLY return the JSON array, nothing else.
 
         // Get an appropriate image URL from Unsplash via Gemini
         final unsplashUrl = await getUnsplashImageUrl(searchQuery);
-        
+
         // Create a new game with the updated imageUrl
         final updatedGame = Game(
           id: game.id,
@@ -1036,5 +1142,42 @@ The descriptions should be:
         "eliminated": "Players who break the game rules or fail to meet objectives.",
       };
     }
+  }
+
+  // Helper method to clean up JSON strings that might be malformed
+  String _cleanupJsonString(String jsonString) {
+    String cleaned = jsonString.trim();
+
+    // Remove any markdown code block delimiters
+    cleaned = cleaned.replaceAll('```json', '');
+    cleaned = cleaned.replaceAll('```', '');
+
+    // Remove common prefixes that Gemini might add
+    final prefixes = [
+      "Here's the JSON:",
+      "Here is the JSON:",
+      "The following is",
+      "Here are the games:",
+    ];
+
+    for (final prefix in prefixes) {
+      if (cleaned.toLowerCase().startsWith(prefix.toLowerCase())) {
+        cleaned = cleaned.substring(prefix.length).trim();
+      }
+    }
+
+    // Check if we're missing array brackets for games list
+    if (!cleaned.startsWith('[') && cleaned.contains('{')) {
+      // If no opening bracket but has objects, likely we need to add brackets
+      if (cleaned.startsWith('{')) {
+        cleaned = '[$cleaned]';
+      }
+    }
+
+    // Clean up trailing commas which can cause JSON parse errors
+    cleaned = cleaned.replaceAll(',}', '}');
+    cleaned = cleaned.replaceAll(',]', ']');
+
+    return cleaned;
   }
 }

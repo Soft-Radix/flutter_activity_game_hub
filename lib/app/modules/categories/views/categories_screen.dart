@@ -1314,9 +1314,45 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         return Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Text(
-              "No more results",
-              style: TextStyle(color: subtitleColor, fontSize: 14, fontWeight: FontWeight.w500),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (useSearchResults
+                    ? _categoryController.searchResults.isEmpty
+                    : _categoryController.categoryGames.isEmpty) ...[
+                  Icon(Icons.search_off, size: 32, color: subtitleColor),
+                  const SizedBox(height: 8),
+                  Text(
+                    "No games found",
+                    style: TextStyle(
+                      color: subtitleColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Try broadening your search or check back later",
+                    style: TextStyle(color: subtitleColor.withOpacity(0.8), fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ] else ...[
+                  Text(
+                    useSearchResults ? "End of search results" : "More games coming soon!",
+                    style: TextStyle(
+                      color: subtitleColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (!useSearchResults)
+                    Text(
+                      "Check back later for new additions",
+                      style: TextStyle(color: subtitleColor.withOpacity(0.8), fontSize: 12),
+                    ),
+                ],
+              ],
             ),
           ),
         );
