@@ -203,13 +203,10 @@ class GeminiApiService {
     For each game:
     - The "winnerGamePlayerOrTeam" field should describe in 1-2 sentences who or which team wins the game and how.
     - The "outOfPlayRules" should be an array of 3-5 strings describing conditions when players are eliminated or out of play.
+    - For the "imageUrl" field, you can just provide any short placeholder text. This will be replaced by the app.
     
     Generate creative and interesting games that are not commonly known or popular.
     Ensure high variety in the types of games, player counts, and durations.
-    
-    IMPORTANT: For the imageUrl field, provide a descriptive search query that can be used to find an appropriate image on Unsplash.
-    The search query should be 2-5 words describing the game's theme or activity. For example: "team building outdoors", "office icebreaker game", "kids puzzle challenge", etc.
-    Do not include actual URLs in this field, just the search terms.
     ''';
 
     // Add pagination information
@@ -482,10 +479,7 @@ class GeminiApiService {
       
       The "winnerGamePlayerOrTeam" field should describe in 1-2 sentences who or which team wins the game and how.
       The "outOfPlayRules" should be an array of 3-5 strings describing conditions when players are eliminated or out of play.
-      
-      IMPORTANT: For the imageUrl field, provide a descriptive search query that can be used to find an appropriate image on Unsplash.
-      The search query should be 2-5 words describing the game's theme or activity. For example: "team building outdoors", "office icebreaker game", "kids puzzle challenge", etc.
-      Do not include actual URLs in this field, just the search terms.
+      For the "imageUrl" field, you can just provide any short placeholder text. This will be replaced by the app.
       
       Return the response as a valid JSON object only, without any additional text, explanation, or markdown formatting.
       Do not include any text before or after the JSON object.
@@ -722,155 +716,19 @@ Remember to ONLY return the JSON array, nothing else.
     }
   }
 
-  // Get Unsplash image URL based on search query
-  Future<String> getUnsplashImageUrl(String searchQuery) async {
-    try {
-      // Get API key from secure storage
-      final apiKey = await ApiConfig.getGeminiApiKey();
-
-      // Check if API key is the default message
-      if (apiKey.startsWith("PLEASE_ADD_YOUR_GEMINI_API_KEY")) {
-        debugPrint('No API key set. Please add your Gemini API key in Settings.');
-        return 'assets/images/placeholder.svg';
-      }
-
-      String prompt = '''
-      Find a high-quality, relevant image from Unsplash for the following query: "$searchQuery".
-      The image should be visually appealing and suitable for use in an activity games app.
-      
-      Return ONLY the Unsplash image URL as plain text. Do not include any markdown, explanation, or JSON formatting.
-      The URL should be a direct link to an Unsplash image.
-      
-      Example of expected format: https://images.unsplash.com/photo-1234567890-abcdefghijk
-      ''';
-
-      // Store the prompt for later reference
-      lastPrompt = prompt;
-
-      // Prepare request body with very low temperature for exact response
-      Map<String, dynamic> requestBody = {
-        "contents": [
-          {
-            "parts": [
-              {"text": prompt},
-            ],
-          },
-        ],
-        "generationConfig": {"temperature": 0.1, "topK": 40, "topP": 0.95, "maxOutputTokens": 1024},
-      };
-
-      // Make API request
-      final response = await _dio.post(
-        "$apiUrl?key=$apiKey",
-        data: requestBody,
-        options: Options(
-          headers: {'Content-Type': 'application/json'},
-          validateStatus: (status) => status! < 500,
-        ),
-      );
-
-      // Store the raw response for debugging
-      lastRawResponse = json.encode(response.data);
-
-      // Handle API response
-      if (response.statusCode == 200) {
-        try {
-          // Extract the text from the response
-          final imageUrl = response.data['candidates'][0]['content']['parts'][0]['text'].trim();
-
-          // Basic validation that it looks like an Unsplash URL
-          if (imageUrl.startsWith('https://') &&
-              (imageUrl.contains('unsplash.com') || imageUrl.contains('images.unsplash'))) {
-            debugPrint('✅ Successfully retrieved Unsplash image URL: $imageUrl');
-            return imageUrl;
-          } else {
-            debugPrint('❌ Invalid Unsplash URL format: $imageUrl');
-            return 'assets/images/placeholder.svg';
-          }
-        } catch (e) {
-          debugPrint('❌ Error parsing Unsplash image response: $e');
-          return 'assets/images/placeholder.svg';
-        }
-      } else {
-        debugPrint('❌ Error getting Unsplash image: ${response.statusCode}');
-        return 'assets/images/placeholder.svg';
-      }
-    } catch (e) {
-      debugPrint('❌ Exception in getUnsplashImageUrl: $e');
-      return 'assets/images/placeholder.svg';
-    }
-  }
-
   // Process game data to fetch and set Unsplash images
   Future<List<Game>> processGamesWithUnsplashImages(List<Game> games) async {
+    // Don't fetch Unsplash images, just use app logo as placeholder
     List<Game> processedGames = [];
 
     for (var game in games) {
-      // If the imageUrl is not already a valid URL or asset path, treat it as a search query
-      if (!game.imageUrl.startsWith('http') &&
-          !game.imageUrl.startsWith('https') &&
-          !game.imageUrl.startsWith('assets/')) {
-        // Use the imageUrl field as a search query for Unsplash
-        final searchQuery = game.imageUrl;
-
-        // Get an appropriate image URL from Unsplash via Gemini
-        final unsplashUrl = await getUnsplashImageUrl(searchQuery);
-
-        // Create a new game with the updated imageUrl
-        final updatedGame = Game(
-          id: game.id,
-          name: game.name,
-          description: game.description,
-          category: game.category,
-          imageUrl: unsplashUrl,
-          minPlayers: game.minPlayers,
-          maxPlayers: game.maxPlayers,
-          estimatedTimeMinutes: game.estimatedTimeMinutes,
-          instructions: game.instructions,
-          isFeatured: game.isFeatured,
-          difficultyLevel: game.difficultyLevel,
-          materialsRequired: game.materialsRequired,
-          gameType: game.gameType,
-          rating: game.rating,
-          isTimeBound: game.isTimeBound,
-          teamBased: game.teamBased,
-          rules: game.rules,
-          howToPlay: game.howToPlay,
-          winnerGamePlayerOrTeam: game.winnerGamePlayerOrTeam,
-          outOfPlayRules: game.outOfPlayRules,
-        );
-
-        processedGames.add(updatedGame);
-      } else {
-        // If the imageUrl is already valid, add the game as is
-        processedGames.add(game);
-      }
-    }
-
-    return processedGames;
-  }
-
-  // Process a single game with Unsplash images
-  Future<Game?> processGameWithUnsplashImage(Game? game) async {
-    if (game == null) return null;
-
-    // If the imageUrl is not already a valid URL or asset path, treat it as a search query
-    if (!game.imageUrl.startsWith('http') &&
-        !game.imageUrl.startsWith('https') &&
-        !game.imageUrl.startsWith('assets/')) {
-      // Use the imageUrl field as a search query for Unsplash
-      final searchQuery = game.imageUrl;
-
-      // Get an appropriate image URL from Unsplash via Gemini
-      final unsplashUrl = await getUnsplashImageUrl(searchQuery);
-
-      // Create a new game with the updated imageUrl
-      return Game(
+      // Create a new game with the updated imageUrl pointing to app logo
+      final updatedGame = Game(
         id: game.id,
         name: game.name,
         description: game.description,
         category: game.category,
-        imageUrl: unsplashUrl,
+        imageUrl: 'assets/icons/app_logo.svg', // Use app logo as placeholder
         minPlayers: game.minPlayers,
         maxPlayers: game.maxPlayers,
         estimatedTimeMinutes: game.estimatedTimeMinutes,
@@ -887,10 +745,40 @@ Remember to ONLY return the JSON array, nothing else.
         winnerGamePlayerOrTeam: game.winnerGamePlayerOrTeam,
         outOfPlayRules: game.outOfPlayRules,
       );
+
+      processedGames.add(updatedGame);
     }
 
-    // If the imageUrl is already valid, return the game as is
-    return game;
+    return processedGames;
+  }
+
+  // Process a single game with Unsplash images
+  Future<Game?> processGameWithUnsplashImage(Game? game) async {
+    if (game == null) return null;
+
+    // Don't fetch from Unsplash, use app logo instead
+    return Game(
+      id: game.id,
+      name: game.name,
+      description: game.description,
+      category: game.category,
+      imageUrl: 'assets/icons/app_logo.svg', // Use app logo as placeholder
+      minPlayers: game.minPlayers,
+      maxPlayers: game.maxPlayers,
+      estimatedTimeMinutes: game.estimatedTimeMinutes,
+      instructions: game.instructions,
+      isFeatured: game.isFeatured,
+      difficultyLevel: game.difficultyLevel,
+      materialsRequired: game.materialsRequired,
+      gameType: game.gameType,
+      rating: game.rating,
+      isTimeBound: game.isTimeBound,
+      teamBased: game.teamBased,
+      rules: game.rules,
+      howToPlay: game.howToPlay,
+      winnerGamePlayerOrTeam: game.winnerGamePlayerOrTeam,
+      outOfPlayRules: game.outOfPlayRules,
+    );
   }
 
   // Add a new method to get out of play rules from Gemini for a specific game

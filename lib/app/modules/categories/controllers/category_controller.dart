@@ -22,7 +22,7 @@ class CategoryController extends GetxController {
   final RxList<Game> searchResults = <Game>[].obs;
   final RxBool isLoadingMore = false.obs;
   final RxBool hasMoreResults = true.obs;
-  final int pageSize = 20;
+  final int pageSize = 5;
   final RxInt currentPage = 1.obs;
   final RxString lastSearchQuery = "".obs;
 
